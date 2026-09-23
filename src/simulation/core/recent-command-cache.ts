@@ -29,7 +29,7 @@ export class RecentCommandCache<TValue> {
     this.entries.set(commandId, value);
 
     while (this.entries.size > this.limit) {
-      const oldest = this.entries.keys().next().value as string | undefined;
+      const oldest = this.entries.keys().next().value;
       if (oldest === undefined) break;
       this.entries.delete(oldest);
     }
