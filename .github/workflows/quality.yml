@@ -34,3 +34,6 @@ jobs:
 
       - run: npm run typecheck
       - run: npm run lint
+
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
