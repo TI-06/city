@@ -1,3 +1,5 @@
+const encoder = new TextEncoder();
+
 export function measureJsonBytes(value: unknown): number {
-  return JSON.stringify(value).length;
+  return encoder.encode(JSON.stringify(value)).byteLength;
 }
