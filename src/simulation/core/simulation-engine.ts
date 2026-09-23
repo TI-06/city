@@ -21,9 +21,22 @@ type SimulationEngineCreateOptions<TWorld> = Readonly<{
   recentCommandLimit?: number;
 }>;
 
+type SimulationEngineRestoreOptions<TWorld> = Readonly<{
+  state: SimulationState<TWorld>;
+  handlers?: readonly CommandHandler<TWorld>[];
+  systems?: readonly SimulationSystem<TWorld>[];
+  recentCommandLimit?: number;
+}>;
+
 function assertPositiveInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new RangeError(`${label} must be a positive integer`);
+  }
+}
+
+function assertNonNegativeInteger(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new RangeError(`${label} must be a non-negative integer`);
   }
 }
 
@@ -40,24 +53,21 @@ export class SimulationEngine<TWorld> {
   private readonly systems: readonly SimulationSystem<TWorld>[];
   private readonly recentCommands: RecentCommandCache<MutationResponse<unknown, unknown>>;
 
-  private constructor(options: SimulationEngineCreateOptions<TWorld>) {
-    const random = SeededRandom.fromSeed(options.seed);
+  private constructor(
+    state: SimulationState<TWorld>,
+    handlers: readonly CommandHandler<TWorld>[],
+    systems: readonly SimulationSystem<TWorld>[],
+    recentCommandLimit: number,
+  ) {
+    this.currentState = state;
 
-    this.currentState = {
-      revision: 0,
-      clock: createSimulationClock(),
-      randomState: random.snapshot(),
-      world: options.world,
-    };
-
-    for (const handler of options.handlers ?? []) {
+    for (const handler of handlers) {
       if (this.handlers.has(handler.type)) {
         throw new Error(`Duplicate simulation command handler: ${handler.type}`);
       }
       this.handlers.set(handler.type, handler);
     }
 
-    const systems = options.systems ?? [];
     const systemIds = new Set<string>();
     for (const system of systems) {
       if (systemIds.has(system.id)) {
@@ -67,15 +77,47 @@ export class SimulationEngine<TWorld> {
     }
     this.systems = [...systems];
 
-    this.recentCommands = new RecentCommandCache(
-      options.recentCommandLimit ?? DEFAULT_RECENT_COMMAND_LIMIT,
-    );
+    this.recentCommands = new RecentCommandCache(recentCommandLimit);
   }
 
   public static create<TWorld>(
     options: SimulationEngineCreateOptions<TWorld>,
   ): SimulationEngine<TWorld> {
-    return new SimulationEngine(options);
+    const random = SeededRandom.fromSeed(options.seed);
+    const state: SimulationState<TWorld> = {
+      revision: 0,
+      clock: createSimulationClock(),
+      randomState: random.snapshot(),
+      world: options.world,
+    };
+
+    return new SimulationEngine(
+      state,
+      options.handlers ?? [],
+      options.systems ?? [],
+      options.recentCommandLimit ?? DEFAULT_RECENT_COMMAND_LIMIT,
+    );
+  }
+
+  public static restore<TWorld>(
+    options: SimulationEngineRestoreOptions<TWorld>,
+  ): SimulationEngine<TWorld> {
+    assertNonNegativeInteger(options.state.revision, 'Simulation revision');
+    const clock = createSimulationClock(options.state.clock.elapsedHours);
+    const random = SeededRandom.fromState(options.state.randomState);
+    const state: SimulationState<TWorld> = {
+      revision: options.state.revision,
+      clock,
+      randomState: random.snapshot(),
+      world: options.state.world,
+    };
+
+    return new SimulationEngine(
+      state,
+      options.handlers ?? [],
+      options.systems ?? [],
+      options.recentCommandLimit ?? DEFAULT_RECENT_COMMAND_LIMIT,
+    );
   }
 
   public get state(): SimulationState<TWorld> {
