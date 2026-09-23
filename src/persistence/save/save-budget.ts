@@ -8,8 +8,6 @@ export function assertSaveWithinBudget(save: unknown, budgetBytes: number): void
   const bytes = measureJsonBytes(save);
 
   if (bytes > budgetBytes) {
-    throw new RangeError(
-      `Save is ${bytes} bytes and exceeds save budget of ${budgetBytes} bytes`,
-    );
+    throw new RangeError(`Save is ${bytes} bytes and exceeds save budget of ${budgetBytes} bytes`);
   }
 }
