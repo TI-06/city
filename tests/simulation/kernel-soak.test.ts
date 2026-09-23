@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { assertSaveWithinBudget, SAVE_BUDGET_STARTER_BYTES } from '../../src/persistence/save/save-budget';
+import {
+  assertSaveWithinBudget,
+  SAVE_BUDGET_STARTER_BYTES,
+} from '../../src/persistence/save/save-budget';
 import { measureJsonBytes } from '../../src/shared/serialization/measure-json-bytes';
 import type { GameCommand } from '../../src/shared/transport/game-command';
 import type { CommandHandler } from '../../src/simulation/core/command-handler';
