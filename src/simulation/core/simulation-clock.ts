@@ -17,10 +17,7 @@ export function createSimulationClock(elapsedHours = 0): SimulationClockState {
   return { elapsedHours };
 }
 
-export function advanceClock(
-  clock: SimulationClockState,
-  hours: number,
-): SimulationClockState {
+export function advanceClock(clock: SimulationClockState, hours: number): SimulationClockState {
   assertNonNegativeInteger(clock.elapsedHours, 'clock.elapsedHours');
   assertNonNegativeInteger(hours, 'hours');
 
