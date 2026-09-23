@@ -21,4 +21,27 @@ export default tseslint.config(
       '@typescript-eslint/no-misused-promises': 'error',
     },
   },
+  {
+    files: ['src/simulation/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'react', message: 'Simulation code must not depend on React.' },
+            { name: 'react-dom', message: 'Simulation code must not depend on ReactDOM.' },
+            { name: 'phaser', message: 'Simulation code must not depend on Phaser.' },
+          ],
+        },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'Use the deterministic SeededRandom in simulation code.',
+        },
+      ],
+    },
+  },
 );
