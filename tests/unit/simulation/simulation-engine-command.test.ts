@@ -46,11 +46,19 @@ const randomizeHandler: CommandHandler<World> = {
   },
 };
 
+const largeResponseHandler: CommandHandler<World> = {
+  type: 'LARGE_RESPONSE',
+  apply: (world) => ({
+    world: { ...world, value: 999 },
+    delta: { data: 'x'.repeat(129 * 1024) },
+  }),
+};
+
 function createEngine(onIncrementApply?: () => void) {
   return SimulationEngine.create({
     world: { value: 0, randomValue: null } satisfies World,
     seed: 'engine-seed',
-    handlers: [incrementHandler(onIncrementApply), randomizeHandler],
+    handlers: [incrementHandler(onIncrementApply), randomizeHandler, largeResponseHandler],
   });
 }
 
@@ -156,6 +164,21 @@ describe('SimulationEngine command dispatch', () => {
     expect(() => engine.dispatch(command)).toThrow(/ordinary command hard limit/i);
     expect(applyCount).toBe(0);
     expect(engine.state.revision).toBe(0);
+  });
+
+  it('rejects an oversized response before committing state or caching it', () => {
+    const engine = createEngine();
+    const before = engine.state;
+    const command: GameCommand<'LARGE_RESPONSE', Record<string, never>> = {
+      commandId: 'large-response',
+      baseRevision: 0,
+      type: 'LARGE_RESPONSE',
+      payload: {},
+    };
+
+    expect(() => engine.dispatch(command)).toThrow(/ordinary response target/i);
+    expect(engine.state).toEqual(before);
+    expect(engine.recentCommandCount).toBe(0);
   });
 
   it('throws for an unknown command without mutating state', () => {
