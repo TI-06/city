@@ -5,10 +5,7 @@ import type {
 } from '../../shared/transport/game-command';
 import { assertOrdinaryCommandSize } from '../../shared/transport/command-budget';
 import type { CommandHandler } from './command-handler';
-import {
-  DEFAULT_RECENT_COMMAND_LIMIT,
-  RecentCommandCache,
-} from './recent-command-cache';
+import { DEFAULT_RECENT_COMMAND_LIMIT, RecentCommandCache } from './recent-command-cache';
 import { createSimulationClock } from './simulation-clock';
 import { SeededRandom, type RandomSeed } from './seeded-random';
 import type { SimulationState } from './simulation-state';
