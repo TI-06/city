@@ -13,3 +13,13 @@ export function assertOrdinaryCommandSize(command: unknown): void {
     );
   }
 }
+
+export function assertOrdinaryResponseSize(response: unknown): void {
+  const bytes = measureJsonBytes(response);
+
+  if (bytes > ORDINARY_RESPONSE_TARGET_BYTES) {
+    throw new RangeError(
+      `Response is ${bytes} bytes and exceeds ordinary response target of ${ORDINARY_RESPONSE_TARGET_BYTES} bytes`,
+    );
+  }
+}
