@@ -6,9 +6,10 @@ import type {
 import { assertOrdinaryCommandSize } from '../../shared/transport/command-budget';
 import type { CommandHandler } from './command-handler';
 import { DEFAULT_RECENT_COMMAND_LIMIT, RecentCommandCache } from './recent-command-cache';
-import { createSimulationClock } from './simulation-clock';
+import { advanceClock, createSimulationClock } from './simulation-clock';
 import { SeededRandom, type RandomSeed } from './seeded-random';
 import type { SimulationState } from './simulation-state';
+import type { SimulationSystem } from './simulation-system';
 
 export type SimulationDispatchResult = MutationResponse<unknown, unknown> | RevisionConflict;
 
@@ -16,8 +17,15 @@ type SimulationEngineCreateOptions<TWorld> = Readonly<{
   world: TWorld;
   seed: RandomSeed;
   handlers?: readonly CommandHandler<TWorld>[];
+  systems?: readonly SimulationSystem<TWorld>[];
   recentCommandLimit?: number;
 }>;
+
+function assertPositiveInteger(value: number, label: string): void {
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new RangeError(`${label} must be a positive integer`);
+  }
+}
 
 export class UnknownSimulationCommandError extends Error {
   public constructor(public readonly commandType: string) {
@@ -29,6 +37,7 @@ export class UnknownSimulationCommandError extends Error {
 export class SimulationEngine<TWorld> {
   private currentState: SimulationState<TWorld>;
   private readonly handlers = new Map<string, CommandHandler<TWorld>>();
+  private readonly systems: readonly SimulationSystem<TWorld>[];
   private readonly recentCommands: RecentCommandCache<MutationResponse<unknown, unknown>>;
 
   private constructor(options: SimulationEngineCreateOptions<TWorld>) {
@@ -47,6 +56,16 @@ export class SimulationEngine<TWorld> {
       }
       this.handlers.set(handler.type, handler);
     }
+
+    const systems = options.systems ?? [];
+    const systemIds = new Set<string>();
+    for (const system of systems) {
+      if (systemIds.has(system.id)) {
+        throw new Error(`Duplicate simulation system: ${system.id}`);
+      }
+      systemIds.add(system.id);
+    }
+    this.systems = [...systems];
 
     this.recentCommands = new RecentCommandCache(
       options.recentCommandLimit ?? DEFAULT_RECENT_COMMAND_LIMIT,
@@ -117,5 +136,34 @@ export class SimulationEngine<TWorld> {
     this.recentCommands.set(command.commandId, response);
 
     return response;
+  }
+
+  public step(hours = 1): SimulationState<TWorld> {
+    assertPositiveInteger(hours, 'Simulation step hours');
+
+    const revision = this.currentState.revision + hours;
+    if (!Number.isSafeInteger(revision)) {
+      throw new RangeError('Simulation revision exceeded safe integer range');
+    }
+
+    let world = this.currentState.world;
+    let clock = this.currentState.clock;
+    const random = SeededRandom.fromState(this.currentState.randomState);
+
+    for (let hour = 0; hour < hours; hour += 1) {
+      for (const system of this.systems) {
+        world = system.step(world, { clock, random });
+      }
+      clock = advanceClock(clock, 1);
+    }
+
+    this.currentState = {
+      revision,
+      clock,
+      randomState: random.snapshot(),
+      world,
+    };
+
+    return this.currentState;
   }
 }
