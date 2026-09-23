@@ -4,8 +4,9 @@ import {
   ORDINARY_COMMAND_TARGET_BYTES,
   ORDINARY_RESPONSE_TARGET_BYTES,
   assertOrdinaryCommandSize,
+  assertOrdinaryResponseSize,
 } from '../../../src/shared/transport/command-budget';
-import type { GameCommand } from '../../../src/shared/transport/game-command';
+import type { GameCommand, MutationResponse } from '../../../src/shared/transport/game-command';
 
 describe('command payload budgets', () => {
   it('defines the architecture budgets from the design spec', () => {
@@ -36,5 +37,27 @@ describe('command payload budgets', () => {
     expect(() => assertOrdinaryCommandSize(command)).toThrow(
       /exceeds ordinary command hard limit/i,
     );
+  });
+
+  it('accepts a compact ordinary mutation response', () => {
+    const response: MutationResponse<{ value: number }> = {
+      commandId: 'cmd-1',
+      revision: 13,
+      delta: { value: 42 },
+      events: [],
+    };
+
+    expect(() => assertOrdinaryResponseSize(response)).not.toThrow();
+  });
+
+  it('rejects an ordinary mutation response larger than the response target', () => {
+    const response: MutationResponse<{ data: string }> = {
+      commandId: 'cmd-large-response',
+      revision: 13,
+      delta: { data: 'x'.repeat(ORDINARY_RESPONSE_TARGET_BYTES + 1024) },
+      events: [],
+    };
+
+    expect(() => assertOrdinaryResponseSize(response)).toThrow(/exceeds ordinary response target/i);
   });
 });
