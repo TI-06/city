@@ -3,7 +3,10 @@ import type {
   MutationResponse,
   RevisionConflict,
 } from '../../shared/transport/game-command';
-import { assertOrdinaryCommandSize } from '../../shared/transport/command-budget';
+import {
+  assertOrdinaryCommandSize,
+  assertOrdinaryResponseSize,
+} from '../../shared/transport/command-budget';
 import type { CommandHandler } from './command-handler';
 import { DEFAULT_RECENT_COMMAND_LIMIT, RecentCommandCache } from './recent-command-cache';
 import { advanceClock, createSimulationClock } from './simulation-clock';
@@ -168,6 +171,7 @@ export class SimulationEngine<TWorld> {
       delta: application.delta,
       events: application.events ?? [],
     };
+    assertOrdinaryResponseSize(response);
 
     this.currentState = {
       revision,
