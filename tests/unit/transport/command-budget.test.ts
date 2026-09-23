@@ -6,10 +6,7 @@ import {
   assertOrdinaryCommandSize,
   assertOrdinaryResponseSize,
 } from '../../../src/shared/transport/command-budget';
-import type {
-  GameCommand,
-  MutationResponse,
-} from '../../../src/shared/transport/game-command';
+import type { GameCommand, MutationResponse } from '../../../src/shared/transport/game-command';
 
 describe('command payload budgets', () => {
   it('defines the architecture budgets from the design spec', () => {
