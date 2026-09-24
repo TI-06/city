@@ -243,17 +243,18 @@ describe('SET_ZONE_CELLS command', () => {
     const engine = createEngine(
       createCityWorldState(base.map, base.roads, base.zoning, buildings, base.developmentDemand),
     );
+    const buildingsBefore = engine.state.world.buildings;
 
     engine.dispatch(
       zoneCommand('zone-building-commercial', 0, ZoneCode.COMMERCIAL, [{ x: 0, y: 0 }]),
     );
     expect(engine.state.world.zoning.grid.get(0, 0)).toBe(ZoneCode.COMMERCIAL);
-    expect(engine.state.world.buildings).toBe(buildings);
+    expect(engine.state.world.buildings).toBe(buildingsBefore);
     expect(engine.state.world.buildings.buildings[0]?.id).toBe(1);
 
     engine.dispatch(zoneCommand('zone-building-clear', 1, ZoneCode.NONE, [{ x: 0, y: 0 }]));
     expect(engine.state.world.zoning.grid.get(0, 0)).toBe(ZoneCode.NONE);
-    expect(engine.state.world.buildings).toBe(buildings);
+    expect(engine.state.world.buildings).toBe(buildingsBefore);
     expect(engine.state.world.buildings.buildings[0]?.use).toBe('residential');
   });
 
