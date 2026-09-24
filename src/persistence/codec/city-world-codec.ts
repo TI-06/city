@@ -1,8 +1,5 @@
 import type { WorldSaveCodec } from '../../simulation/core/kernel-save';
-import {
-  createCityWorldState,
-  type CityWorldState,
-} from '../../simulation/world/city-world-state';
+import { createCityWorldState, type CityWorldState } from '../../simulation/world/city-world-state';
 import {
   decodeRoadNetworkState,
   encodeRoadNetworkState,
@@ -19,9 +16,7 @@ export type EncodedCityWorldState = Readonly<{
   roads: EncodedRoadNetworkState;
 }>;
 
-export function encodeCityWorldState(
-  world: CityWorldState,
-): EncodedCityWorldState {
+export function encodeCityWorldState(world: CityWorldState): EncodedCityWorldState {
   const validated = createCityWorldState(world.map, world.roads);
 
   return {
@@ -30,19 +25,11 @@ export function encodeCityWorldState(
   };
 }
 
-export function decodeCityWorldState(
-  saved: EncodedCityWorldState,
-): CityWorldState {
-  return createCityWorldState(
-    decodeWorldMapState(saved.map),
-    decodeRoadNetworkState(saved.roads),
-  );
+export function decodeCityWorldState(saved: EncodedCityWorldState): CityWorldState {
+  return createCityWorldState(decodeWorldMapState(saved.map), decodeRoadNetworkState(saved.roads));
 }
 
-export const cityWorldSaveCodec: WorldSaveCodec<
-  CityWorldState,
-  EncodedCityWorldState
-> = {
+export const cityWorldSaveCodec: WorldSaveCodec<CityWorldState, EncodedCityWorldState> = {
   encode: encodeCityWorldState,
   decode: decodeCityWorldState,
 };
