@@ -14,6 +14,16 @@ export type EncodedRoadNetworkState = Readonly<{
   edges: readonly (readonly [id: number, nodeA: number, nodeB: number])[];
 }>;
 
+function assertRoadTuple(
+  tuple: unknown,
+  label: 'node' | 'edge',
+  index: number,
+): asserts tuple is readonly [number, number, number] {
+  if (!Array.isArray(tuple) || tuple.length !== 3) {
+    throw new RangeError(`Road ${label} tuple at index ${index} must contain exactly 3 values`);
+  }
+}
+
 export function encodeRoadNetworkState(state: RoadNetworkState): EncodedRoadNetworkState {
   return {
     codecVersion: ROAD_NETWORK_CODEC_VERSION,
@@ -34,14 +44,22 @@ export function decodeRoadNetworkState(saved: EncodedRoadNetworkState): RoadNetw
     topologyVersion: saved.topologyVersion,
     nextNodeId: saved.nextNodeId,
     nextEdgeId: saved.nextEdgeId,
-    nodes: saved.nodes.map(([id, x, y]) => ({ id, x, y })),
-    edges: saved.edges.map(([id, nodeA, nodeB]) => ({
-      id,
-      nodeA,
-      nodeB,
-      roadType: 'two-lane',
-      laneCount: 2,
-      lengthCells: 1,
-    })),
+    nodes: saved.nodes.map((tuple, index) => {
+      assertRoadTuple(tuple, 'node', index);
+      const [id, x, y] = tuple;
+      return { id, x, y };
+    }),
+    edges: saved.edges.map((tuple, index) => {
+      assertRoadTuple(tuple, 'edge', index);
+      const [id, nodeA, nodeB] = tuple;
+      return {
+        id,
+        nodeA,
+        nodeB,
+        roadType: 'two-lane',
+        laneCount: 2,
+        lengthCells: 1,
+      };
+    }),
   });
 }
