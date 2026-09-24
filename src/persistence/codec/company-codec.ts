@@ -52,12 +52,10 @@ function decodeCompanyTuple(tuple: unknown, index: number): Company {
   const kindCode = values[2];
   const jobCapacity = values[3];
 
-  if (
-    typeof id !== 'number' ||
-    typeof buildingId !== 'number' ||
-    typeof jobCapacity !== 'number'
-  ) {
-    throw new RangeError(`Company tuple at index ${index} requires numeric id, buildingId, and jobCapacity`);
+  if (typeof id !== 'number' || typeof buildingId !== 'number' || typeof jobCapacity !== 'number') {
+    throw new RangeError(
+      `Company tuple at index ${index} requires numeric id, buildingId, and jobCapacity`,
+    );
   }
 
   return {
