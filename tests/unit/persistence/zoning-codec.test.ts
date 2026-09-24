@@ -8,10 +8,7 @@ import {
 import { encodeChunkedByteGrid } from '../../../src/persistence/codec/chunked-byte-grid-codec';
 import { ChunkedByteGrid } from '../../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
-import {
-  ZoneCode,
-  createZoningState,
-} from '../../../src/simulation/zoning/zoning-state';
+import { ZoneCode, createZoningState } from '../../../src/simulation/zoning/zoning-state';
 
 function createFixture() {
   const dimensions = createGridDimensions(33, 34);
