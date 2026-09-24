@@ -5,11 +5,7 @@ import {
   encodeBuildingState,
   type EncodedBuildingState,
 } from './building-codec';
-import {
-  decodeCompanyState,
-  encodeCompanyState,
-  type EncodedCompanyState,
-} from './company-codec';
+import { decodeCompanyState, encodeCompanyState, type EncodedCompanyState } from './company-codec';
 import {
   decodeDevelopmentDemandState,
   encodeDevelopmentDemandState,
