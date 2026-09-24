@@ -1,8 +1,5 @@
 import type { RoadBuildPlan } from './road-build-plan';
-import {
-  createRoadNetworkState,
-  type RoadNetworkState,
-} from './road-network-state';
+import { createRoadNetworkState, type RoadNetworkState } from './road-network-state';
 
 function assertSequentialIds(
   actualIds: readonly number[],
@@ -21,10 +18,7 @@ function assertSequentialIds(
   }
 }
 
-export function applyRoadBuild(
-  state: RoadNetworkState,
-  plan: RoadBuildPlan,
-): RoadNetworkState {
+export function applyRoadBuild(state: RoadNetworkState, plan: RoadBuildPlan): RoadNetworkState {
   if (plan.nodesToAdd.length === 0 && plan.edgesToAdd.length === 0) {
     return state;
   }
