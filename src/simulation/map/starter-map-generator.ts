@@ -1,14 +1,7 @@
 import { ChunkedByteGrid } from './chunked-byte-grid';
-import {
-  createGridDimensions,
-  type GridDimensions,
-} from './grid-dimensions';
+import { createGridDimensions, type GridDimensions } from './grid-dimensions';
 import { SeededRandom, type RandomSeed } from '../core/seeded-random';
-import {
-  TerrainCode,
-  WORLD_MAP_GENERATOR_VERSION,
-  type WorldMapState,
-} from './world-map-state';
+import { TerrainCode, WORLD_MAP_GENERATOR_VERSION, type WorldMapState } from './world-map-state';
 
 export const DEFAULT_STARTER_MAP_SIZE = 128;
 export const MIN_STARTER_MAP_AXIS_CELLS = 16;
@@ -32,18 +25,10 @@ function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
 
-function createRiverCenters(
-  seed: string,
-  dimensions: GridDimensions,
-): readonly number[] {
-  const random = SeededRandom.fromSeed(
-    `map-v${WORLD_MAP_GENERATOR_VERSION}:${seed}`,
-  );
+function createRiverCenters(seed: string, dimensions: GridDimensions): readonly number[] {
+  const random = SeededRandom.fromSeed(`map-v${WORLD_MAP_GENERATOR_VERSION}:${seed}`);
   const centerMinimum = Math.max(2, Math.floor(dimensions.width * 0.3));
-  const centerMaximum = Math.min(
-    dimensions.width - 3,
-    Math.ceil(dimensions.width * 0.7) - 1,
-  );
+  const centerMaximum = Math.min(dimensions.width - 3, Math.ceil(dimensions.width * 0.7) - 1);
   const span = centerMaximum - centerMinimum + 1;
 
   let riverX = centerMinimum + (random.nextUint32() % span);
@@ -72,11 +57,7 @@ export function createStarterWorldMap(
   const riverCenters = createRiverCenters(mapSeed, validated);
 
   const terrain = ChunkedByteGrid.generate(validated, (x, y) => {
-    const isOuterBorder =
-      x < 2 ||
-      y < 2 ||
-      x >= validated.width - 2 ||
-      y >= validated.height - 2;
+    const isOuterBorder = x < 2 || y < 2 || x >= validated.width - 2 || y >= validated.height - 2;
 
     if (isOuterBorder) {
       return TerrainCode.LAND;
