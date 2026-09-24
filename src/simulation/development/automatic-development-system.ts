@@ -67,19 +67,14 @@ export function createAutomaticDevelopmentSystem(): SimulationSystem<CityWorldSt
         return world;
       }
 
-      if (
-        roadAccess === undefined ||
-        cachedRoadTopologyVersion !== world.roads.topologyVersion
-      ) {
+      if (roadAccess === undefined || cachedRoadTopologyVersion !== world.roads.topologyVersion) {
         roadAccess = createRoadAccessIndex(world.roads);
         cachedRoadTopologyVersion = world.roads.topologyVersion;
       }
 
       if (cachedBuildingVersion !== world.buildings.version) {
         occupiedBuildingCoordinates = new Set(
-          world.buildings.buildings.map((building) =>
-            coordinateKey(building.x, building.y),
-          ),
+          world.buildings.buildings.map((building) => coordinateKey(building.x, building.y)),
         );
         cachedBuildingVersion = world.buildings.version;
       }
