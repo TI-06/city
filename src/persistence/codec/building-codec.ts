@@ -51,7 +51,13 @@ function decodeBuildingTuple(tuple: unknown, index: number): Building {
     throw new RangeError(`Building tuple at index ${index} must contain exactly 5 values`);
   }
 
-  const [id, x, y, useCode, level] = tuple;
+  const values = tuple as readonly unknown[];
+  const id = values[0];
+  const x = values[1];
+  const y = values[2];
+  const useCode = values[3];
+  const level = values[4];
+
   if (typeof id !== 'number' || typeof x !== 'number' || typeof y !== 'number') {
     throw new RangeError(`Building tuple at index ${index} requires numeric id, x, and y`);
   }
