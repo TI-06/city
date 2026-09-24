@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  applyRoadBuild,
-} from '../../../src/simulation/roads/apply-road-build';
+import { applyRoadBuild } from '../../../src/simulation/roads/apply-road-build';
 import type { RoadBuildPlan } from '../../../src/simulation/roads/road-build-plan';
 import {
   createEmptyRoadNetwork,
