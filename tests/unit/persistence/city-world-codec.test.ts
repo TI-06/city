@@ -9,10 +9,12 @@ import {
 import { worldMapSaveCodec } from '../../../src/persistence/codec/world-map-codec';
 import { createBuildingState } from '../../../src/simulation/buildings/building-state';
 import { createDevelopmentDemandState } from '../../../src/simulation/development/development-demand-state';
+import { createCompanyState } from '../../../src/simulation/economy/company-state';
 import { ChunkedByteGrid } from '../../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
 import { createStarterWorldMap } from '../../../src/simulation/map/starter-map-generator';
 import { TerrainCode, type WorldMapState } from '../../../src/simulation/map/world-map-state';
+import { createHouseholdState } from '../../../src/simulation/population/household-state';
 import { createRoadNetworkState } from '../../../src/simulation/roads/road-network-state';
 import {
   createCityWorldState,
@@ -97,6 +99,16 @@ describe('city world codec', () => {
       residential: 60,
       commercial: 60,
       industrial: 60,
+    });
+    expect(city.households).toEqual({
+      version: 0,
+      nextHouseholdId: 1,
+      households: [],
+    });
+    expect(city.companies).toEqual({
+      version: 0,
+      nextCompanyId: 1,
+      companies: [],
     });
     expect(city.map.mapSeed).toBe('city-world-seed');
   });
@@ -311,6 +323,178 @@ describe('city world codec', () => {
 
     expect(city.buildings.buildings[0]?.use).toBe('residential');
     expect(city.zoning.grid.get(cell.x, cell.y)).toBe(ZoneCode.INDUSTRIAL);
+  });
+
+  it('accepts valid household and company building references', () => {
+    const map = createStarterWorldMap('population-valid');
+    const buildings = createBuildingState({
+      version: 3,
+      nextBuildingId: 4,
+      buildings: [
+        { id: 1, x: 2, y: 0, use: 'residential', level: 1 },
+        { id: 2, x: 3, y: 0, use: 'commercial', level: 1 },
+        { id: 3, x: 4, y: 0, use: 'industrial', level: 1 },
+      ],
+    });
+    const households = createHouseholdState({
+      version: 1,
+      nextHouseholdId: 2,
+      households: [{ id: 1, homeBuildingId: 1, memberCount: 3, workerCount: 2 }],
+    });
+    const companies = createCompanyState({
+      version: 2,
+      nextCompanyId: 3,
+      companies: [
+        { id: 1, buildingId: 2, kind: 'commercial', jobCapacity: 8 },
+        { id: 2, buildingId: 3, kind: 'industrial', jobCapacity: 12 },
+      ],
+    });
+
+    const city = createCityWorldState(
+      map,
+      createRoadFixture(),
+      undefined,
+      buildings,
+      undefined,
+      households,
+      companies,
+    );
+
+    expect(city.households).toEqual(households);
+    expect(city.companies).toEqual(companies);
+  });
+
+  it('rejects dangling or wrong-use household building references', () => {
+    const map = createStarterWorldMap('population-household-invalid');
+    const buildings = createBuildingState({
+      version: 2,
+      nextBuildingId: 3,
+      buildings: [
+        { id: 1, x: 2, y: 0, use: 'residential', level: 1 },
+        { id: 2, x: 3, y: 0, use: 'commercial', level: 1 },
+      ],
+    });
+    const dangling = createHouseholdState({
+      version: 1,
+      nextHouseholdId: 2,
+      households: [{ id: 1, homeBuildingId: 99, memberCount: 2, workerCount: 1 }],
+    });
+    const wrongUse = createHouseholdState({
+      version: 1,
+      nextHouseholdId: 2,
+      households: [{ id: 1, homeBuildingId: 2, memberCount: 2, workerCount: 1 }],
+    });
+
+    expect(() =>
+      createCityWorldState(map, createRoadFixture(), undefined, buildings, undefined, dangling),
+    ).toThrow(/household.*building/i);
+    expect(() =>
+      createCityWorldState(map, createRoadFixture(), undefined, buildings, undefined, wrongUse),
+    ).toThrow(/household.*residential/i);
+  });
+
+  it('rejects dangling, residential, or kind-mismatched company references', () => {
+    const map = createStarterWorldMap('population-company-invalid');
+    const buildings = createBuildingState({
+      version: 3,
+      nextBuildingId: 4,
+      buildings: [
+        { id: 1, x: 2, y: 0, use: 'residential', level: 1 },
+        { id: 2, x: 3, y: 0, use: 'commercial', level: 1 },
+        { id: 3, x: 4, y: 0, use: 'industrial', level: 1 },
+      ],
+    });
+    const dangling = createCompanyState({
+      version: 1,
+      nextCompanyId: 2,
+      companies: [{ id: 1, buildingId: 99, kind: 'commercial', jobCapacity: 8 }],
+    });
+    const residential = createCompanyState({
+      version: 1,
+      nextCompanyId: 2,
+      companies: [{ id: 1, buildingId: 1, kind: 'commercial', jobCapacity: 8 }],
+    });
+    const mismatched = createCompanyState({
+      version: 1,
+      nextCompanyId: 2,
+      companies: [{ id: 1, buildingId: 2, kind: 'industrial', jobCapacity: 12 }],
+    });
+
+    expect(() =>
+      createCityWorldState(
+        map,
+        createRoadFixture(),
+        undefined,
+        buildings,
+        undefined,
+        undefined,
+        dangling,
+      ),
+    ).toThrow(/company.*building/i);
+    expect(() =>
+      createCityWorldState(
+        map,
+        createRoadFixture(),
+        undefined,
+        buildings,
+        undefined,
+        undefined,
+        residential,
+      ),
+    ).toThrow(/company.*commercial|industrial/i);
+    expect(() =>
+      createCityWorldState(
+        map,
+        createRoadFixture(),
+        undefined,
+        buildings,
+        undefined,
+        undefined,
+        mismatched,
+      ),
+    ).toThrow(/company.*kind|building use/i);
+  });
+
+  it('round-trips compact household and company references through CityWorld v3', () => {
+    const map = createStarterWorldMap('population-round-trip');
+    const buildings = createBuildingState({
+      version: 2,
+      nextBuildingId: 3,
+      buildings: [
+        { id: 1, x: 2, y: 0, use: 'residential', level: 1 },
+        { id: 2, x: 3, y: 0, use: 'industrial', level: 1 },
+      ],
+    });
+    const households = createHouseholdState({
+      version: 1,
+      nextHouseholdId: 2,
+      households: [{ id: 1, homeBuildingId: 1, memberCount: 4, workerCount: 2 }],
+    });
+    const companies = createCompanyState({
+      version: 1,
+      nextCompanyId: 2,
+      companies: [{ id: 1, buildingId: 2, kind: 'industrial', jobCapacity: 12 }],
+    });
+    const city = createCityWorldState(
+      map,
+      createRoadFixture(),
+      undefined,
+      buildings,
+      undefined,
+      households,
+      companies,
+    );
+
+    const encoded = encodeCityWorldState(city);
+    const restored = decodeCityWorldState(encoded);
+
+    expect(encoded.codecVersion).toBe(CITY_WORLD_CODEC_VERSION);
+    expect(encoded.households.households).toEqual([[1, 1, 4, 2]]);
+    expect(encoded.companies.companies).toEqual([[1, 2, 2, 12]]);
+    expect(restored.households).toEqual(households);
+    expect(restored.companies).toEqual(companies);
+    expect(JSON.stringify(encoded.households)).not.toContain('"x"');
+    expect(JSON.stringify(encoded.companies)).not.toContain('"use"');
   });
 
   it('round-trips map terrain, road tuples, zoning, buildings, and demand', () => {
