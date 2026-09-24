@@ -7,16 +7,11 @@ export type GridDimensions = Readonly<{
 
 function assertAxis(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 1 || value > MAX_MAP_AXIS_CELLS) {
-    throw new RangeError(
-      `${label} must be an integer between 1 and ${MAX_MAP_AXIS_CELLS}`,
-    );
+    throw new RangeError(`${label} must be an integer between 1 and ${MAX_MAP_AXIS_CELLS}`);
   }
 }
 
-export function createGridDimensions(
-  width: number,
-  height: number,
-): GridDimensions {
+export function createGridDimensions(width: number, height: number): GridDimensions {
   assertAxis(width, 'width');
   assertAxis(height, 'height');
 
