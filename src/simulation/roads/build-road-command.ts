@@ -1,5 +1,5 @@
 import type { CommandHandler } from '../core/command-handler';
-import type { CityWorldState } from '../world/city-world-state';
+import { createCityWorldState, type CityWorldState } from '../world/city-world-state';
 import { applyRoadBuild } from './apply-road-build';
 import { planRoadBuild, type RoadGridPoint } from './road-build-plan';
 
@@ -55,10 +55,7 @@ export const buildRoadPathHandler: CommandHandler<CityWorldState> = {
     const roads = applyRoadBuild(world.roads, plan);
 
     return {
-      world: {
-        ...world,
-        roads,
-      },
+      world: createCityWorldState(world.map, roads, world.zoning),
       delta: {
         topologyVersion: roads.topologyVersion,
         addedNodeIds: plan.nodesToAdd.map((node) => node.id),
