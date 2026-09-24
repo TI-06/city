@@ -111,9 +111,7 @@ describe('SET_ZONE_CELLS command', () => {
     const map = engine.state.world.map;
     const roads = engine.state.world.roads;
 
-    engine.dispatch(
-      zoneCommand('zone-identity', 0, ZoneCode.RESIDENTIAL, [{ x: 0, y: 0 }]),
-    );
+    engine.dispatch(zoneCommand('zone-identity', 0, ZoneCode.RESIDENTIAL, [{ x: 0, y: 0 }]));
 
     expect(engine.state.world.map).toBe(map);
     expect(engine.state.world.roads).toBe(roads);
@@ -122,9 +120,7 @@ describe('SET_ZONE_CELLS command', () => {
   it('clears an existing zone back to NONE', () => {
     const engine = createEngine();
 
-    engine.dispatch(
-      zoneCommand('zone-set', 0, ZoneCode.INDUSTRIAL, [{ x: 0, y: 0 }]),
-    );
+    engine.dispatch(zoneCommand('zone-set', 0, ZoneCode.INDUSTRIAL, [{ x: 0, y: 0 }]));
     engine.dispatch(zoneCommand('zone-clear', 1, ZoneCode.NONE, [{ x: 0, y: 0 }]));
 
     expect(engine.state.world.zoning.grid.get(0, 0)).toBe(ZoneCode.NONE);
@@ -154,12 +150,7 @@ describe('SET_ZONE_CELLS command', () => {
     const before = engine.state;
 
     expect(() =>
-      engine.dispatch(
-        zoneCommand('zone-water', 0, ZoneCode.RESIDENTIAL, [
-          { x: 0, y: 0 },
-          water,
-        ]),
-      ),
+      engine.dispatch(zoneCommand('zone-water', 0, ZoneCode.RESIDENTIAL, [{ x: 0, y: 0 }, water])),
     ).toThrow(ZoningValidationError);
 
     expect(engine.state).toEqual(before);
@@ -191,9 +182,7 @@ describe('SET_ZONE_CELLS command', () => {
     const before = engine.state;
 
     expect(() =>
-      engine.dispatch(
-        zoneCommand('zone-road-cell', 0, ZoneCode.COMMERCIAL, [{ x: 0, y: 0 }]),
-      ),
+      engine.dispatch(zoneCommand('zone-road-cell', 0, ZoneCode.COMMERCIAL, [{ x: 0, y: 0 }])),
     ).toThrow(ZoningValidationError);
 
     expect(engine.state).toEqual(before);
@@ -203,9 +192,9 @@ describe('SET_ZONE_CELLS command', () => {
     const engine = createEngine(createAllLandWorld(512, 16));
     const tooMany = Array.from({ length: MAX_ZONE_CELLS_PER_COMMAND + 1 }, (_, x) => ({ x, y: 0 }));
 
-    expect(() =>
-      engine.dispatch(zoneCommand('zone-empty', 0, ZoneCode.RESIDENTIAL, [])),
-    ).toThrow(ZoningValidationError);
+    expect(() => engine.dispatch(zoneCommand('zone-empty', 0, ZoneCode.RESIDENTIAL, []))).toThrow(
+      ZoningValidationError,
+    );
     expect(() =>
       engine.dispatch(zoneCommand('zone-large', 0, ZoneCode.RESIDENTIAL, tooMany)),
     ).toThrow(ZoningValidationError);
@@ -219,16 +208,12 @@ describe('SET_ZONE_CELLS command', () => {
     ).toThrow(ZoningValidationError);
     expect(() =>
       engine.dispatch(
-        zoneCommand('zone-invalid-coordinate', 0, ZoneCode.RESIDENTIAL, [
-          { x: 1.5, y: 0 },
-        ]),
+        zoneCommand('zone-invalid-coordinate', 0, ZoneCode.RESIDENTIAL, [{ x: 1.5, y: 0 }]),
       ),
     ).toThrow(ZoningValidationError);
     expect(() =>
       engine.dispatch(
-        zoneCommand('zone-out-of-bounds', 0, ZoneCode.RESIDENTIAL, [
-          { x: 512, y: 0 },
-        ]),
+        zoneCommand('zone-out-of-bounds', 0, ZoneCode.RESIDENTIAL, [{ x: 512, y: 0 }]),
       ),
     ).toThrow(ZoningValidationError);
 
@@ -239,12 +224,9 @@ describe('SET_ZONE_CELLS command', () => {
   it('rejects an unknown zone code before mutation', () => {
     const engine = createEngine();
     const before = engine.state;
-    const invalid = zoneCommand(
-      'zone-invalid-code',
-      0,
-      4 as SetZoneCellsPayload['zone'],
-      [{ x: 0, y: 0 }],
-    );
+    const invalid = zoneCommand('zone-invalid-code', 0, 4 as SetZoneCellsPayload['zone'], [
+      { x: 0, y: 0 },
+    ]);
 
     expect(() => engine.dispatch(invalid)).toThrow(ZoningValidationError);
     expect(engine.state).toEqual(before);
@@ -279,9 +261,7 @@ describe('SET_ZONE_CELLS command', () => {
 
   it('replays a duplicate command id without reapplying zoning', () => {
     const engine = createEngine();
-    const command = zoneCommand('zone-duplicate', 0, ZoneCode.RESIDENTIAL, [
-      { x: 0, y: 0 },
-    ]);
+    const command = zoneCommand('zone-duplicate', 0, ZoneCode.RESIDENTIAL, [{ x: 0, y: 0 }]);
 
     const first = engine.dispatch(command);
     const duplicate = engine.dispatch(command);
@@ -296,9 +276,7 @@ describe('SET_ZONE_CELLS command', () => {
     const before = engine.state;
 
     expect(
-      engine.dispatch(
-        zoneCommand('zone-stale', 99, ZoneCode.RESIDENTIAL, [{ x: 0, y: 0 }]),
-      ),
+      engine.dispatch(zoneCommand('zone-stale', 99, ZoneCode.RESIDENTIAL, [{ x: 0, y: 0 }])),
     ).toEqual({
       kind: 'REVISION_CONFLICT',
       expectedRevision: 99,
