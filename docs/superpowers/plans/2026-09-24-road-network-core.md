@@ -22,6 +22,8 @@
 - Roads may be built only on `TerrainCode.LAND`; bridges are out of scope.
 - Reusing an existing road cell costs 0 and never creates a duplicate node.
 - Every unordered pair of adjacent road nodes has at most one edge.
+- Every road edge connects nodes whose Manhattan distance is exactly 1.
+- A composed CityWorld may contain road nodes only inside map bounds and on LAND terrain.
 - Newly created road cells cost exactly 100 currency units each.
 - Building an all-existing path is a valid no-op: simulation revision may advance, but road topology version, next IDs, save topology, and construction cost do not change.
 - Runtime lookup maps/sets are temporary only and are never serialized.
@@ -95,6 +97,7 @@ Cover:
 - edge IDs must be positive safe integers and unique.
 - `nodeA < nodeB` is required for canonical unordered pairs.
 - edge endpoints must exist.
+- edge endpoint coordinates must be orthogonally adjacent with Manhattan distance exactly 1.
 - duplicate unordered node pairs are rejected.
 - all edges must be `two-lane / laneCount=2 / lengthCells=1`.
 - `nextNodeId` and `nextEdgeId` must be strictly greater than every existing ID.
@@ -230,6 +233,7 @@ git commit -m "feat: add compact road network codec"
   - road-network codec
 - Produces:
   - `CityWorldState`
+  - `createCityWorldState(map, roads)`
   - `createStarterCityWorld(seed, dimensions?)`
   - `EncodedCityWorldState`
   - `cityWorldSaveCodec`
@@ -256,7 +260,10 @@ export type EncodedCityWorldState = Readonly<{
 
 Verify:
 - `createStarterCityWorld('seed')` contains deterministic starter map + empty roads.
+- `createCityWorldState()` rejects a road node outside the map.
+- `createCityWorldState()` rejects a road node placed on WATER.
 - codec round-trip preserves every map terrain byte and road tuple.
+- malformed encoded CityWorld with out-of-bounds/water road nodes is rejected on decode.
 - map-only `worldMapSaveCodec` behavior remains unchanged.
 - encoded city world contains no `Uint8Array`, `Map`, or command history.
 
@@ -270,7 +277,7 @@ Expected: missing-module failure.
 
 - [ ] **Step 3: Implement world composition and codec**
 
-`createStarterCityWorld()` delegates to `createStarterWorldMap()` and `createEmptyRoadNetwork()`; no duplicate generation logic.
+`createCityWorldState()` validates every road node with `assertGridCoordinate()` and requires `map.terrain.get(x, y) === TerrainCode.LAND`. `createStarterCityWorld()` delegates to `createStarterWorldMap()` + `createEmptyRoadNetwork()` and then calls `createCityWorldState()`; no duplicate generation logic. `cityWorldSaveCodec.decode()` must also finish through `createCityWorldState()` so malformed cross-domain saves cannot bypass validation.
 
 - [ ] **Step 4: Run focused + full unit tests**
 
