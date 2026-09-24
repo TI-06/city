@@ -149,10 +149,7 @@ describe('BUILD_ROAD_PATH command', () => {
 
   it('rejects road construction through an existing zone before state commit', () => {
     const base = createStarterCityWorld('road-zone-conflict');
-    const zoning = createZoningState(
-      1,
-      base.zoning.grid.withCell(1, 0, ZoneCode.RESIDENTIAL),
-    );
+    const zoning = createZoningState(1, base.zoning.grid.withCell(1, 0, ZoneCode.RESIDENTIAL));
     const engine = createEngine(createCityWorldState(base.map, base.roads, zoning));
     const before = engine.state;
 
