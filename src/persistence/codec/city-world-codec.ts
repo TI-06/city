@@ -10,11 +10,7 @@ import {
   encodeWorldMapState,
   type EncodedWorldMapState,
 } from './world-map-codec';
-import {
-  decodeZoningState,
-  encodeZoningState,
-  type EncodedZoningState,
-} from './zoning-codec';
+import { decodeZoningState, encodeZoningState, type EncodedZoningState } from './zoning-codec';
 
 export const CITY_WORLD_CODEC_VERSION = 1;
 
