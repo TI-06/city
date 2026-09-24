@@ -28,8 +28,20 @@ function dimensionsFromTerrain(terrain: WorldMapState['terrain']): GridDimension
   return terrain.dimensions;
 }
 
+function assertWorldMapDimensionsMatchTerrain(world: WorldMapState): void {
+  const terrainDimensions = world.terrain.dimensions;
+
+  if (
+    world.dimensions.width !== terrainDimensions.width ||
+    world.dimensions.height !== terrainDimensions.height
+  ) {
+    throw new RangeError('World map dimensions must match terrain dimensions');
+  }
+}
+
 export function encodeWorldMapState(world: WorldMapState): EncodedWorldMapState {
   assertSupportedGeneratorVersion(world.generatorVersion);
+  assertWorldMapDimensionsMatchTerrain(world);
 
   return {
     generatorVersion: WORLD_MAP_GENERATOR_VERSION,
