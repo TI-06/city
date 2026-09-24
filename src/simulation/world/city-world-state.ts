@@ -3,15 +3,25 @@ import {
   createEmptyBuildingState,
   type BuildingState,
 } from '../buildings/building-state';
+import type { RandomSeed } from '../core/seeded-random';
 import {
   createDefaultDevelopmentDemand,
   createDevelopmentDemandState,
   type DevelopmentDemandState,
 } from '../development/development-demand-state';
-import type { RandomSeed } from '../core/seeded-random';
+import {
+  createCompanyState,
+  createEmptyCompanyState,
+  type CompanyState,
+} from '../economy/company-state';
 import { assertGridCoordinate, type GridDimensions } from '../map/grid-dimensions';
 import { createStarterWorldMap } from '../map/starter-map-generator';
 import { TerrainCode, type WorldMapState } from '../map/world-map-state';
+import {
+  createEmptyHouseholdState,
+  createHouseholdState,
+  type HouseholdState,
+} from '../population/household-state';
 import { createEmptyRoadNetwork, type RoadNetworkState } from '../roads/road-network-state';
 import { ZoneCode, createEmptyZoning, getZoneAt, type ZoningState } from '../zoning/zoning-state';
 
@@ -21,6 +31,8 @@ export type CityWorldState = Readonly<{
   zoning: ZoningState;
   buildings: BuildingState;
   developmentDemand: DevelopmentDemandState;
+  households: HouseholdState;
+  companies: CompanyState;
 }>;
 
 function coordinateKey(x: number, y: number): string {
@@ -33,6 +45,8 @@ export function createCityWorldState(
   zoning: ZoningState = createEmptyZoning(map.dimensions),
   buildings: BuildingState = createEmptyBuildingState(),
   developmentDemand: DevelopmentDemandState = createDefaultDevelopmentDemand(),
+  households: HouseholdState = createEmptyHouseholdState(),
+  companies: CompanyState = createEmptyCompanyState(),
 ): CityWorldState {
   const zoningDimensions = zoning.grid.dimensions;
   if (
@@ -72,6 +86,8 @@ export function createCityWorldState(
   }
 
   const validatedBuildings = createBuildingState(buildings);
+  const buildingById = new Map(validatedBuildings.buildings.map((building) => [building.id, building]));
+
   for (const building of validatedBuildings.buildings) {
     assertGridCoordinate(map.dimensions, building.x, building.y);
 
@@ -84,12 +100,49 @@ export function createCityWorldState(
     }
   }
 
+  const validatedHouseholds = createHouseholdState(households);
+  for (const household of validatedHouseholds.households) {
+    const home = buildingById.get(household.homeBuildingId);
+    if (home === undefined) {
+      throw new RangeError(
+        `Household ${household.id} home building ${household.homeBuildingId} must reference an existing building`,
+      );
+    }
+    if (home.use !== 'residential') {
+      throw new RangeError(
+        `Household ${household.id} home building ${household.homeBuildingId} must be residential`,
+      );
+    }
+  }
+
+  const validatedCompanies = createCompanyState(companies);
+  for (const company of validatedCompanies.companies) {
+    const building = buildingById.get(company.buildingId);
+    if (building === undefined) {
+      throw new RangeError(
+        `Company ${company.id} building ${company.buildingId} must reference an existing building`,
+      );
+    }
+    if (building.use !== 'commercial' && building.use !== 'industrial') {
+      throw new RangeError(
+        `Company ${company.id} building ${company.buildingId} must be commercial or industrial`,
+      );
+    }
+    if (company.kind !== building.use) {
+      throw new RangeError(
+        `Company ${company.id} kind must match building use ${building.use}`,
+      );
+    }
+  }
+
   return {
     map,
     roads,
     zoning,
     buildings: validatedBuildings,
     developmentDemand: createDevelopmentDemandState(developmentDemand),
+    households: validatedHouseholds,
+    companies: validatedCompanies,
   };
 }
 
