@@ -68,6 +68,7 @@ describe('map storage long-run budgets', () => {
     const engine = createMapEngine(createStarterWorldMap('starter-size'));
     const save = createKernelSaveWithCodec(engine, SAVED_AT_ISO, worldMapSaveCodec);
     const bytes = measureJsonBytes(save);
+    console.info(`map-storage-metric starter128Bytes=${bytes}`);
 
     expect(bytes).toBeLessThan(64 * 1024);
     expect(() => assertSaveWithinBudget(save, SAVE_BUDGET_STARTER_BYTES)).not.toThrow();
@@ -77,8 +78,10 @@ describe('map storage long-run budgets', () => {
     const world = createStarterWorldMap('max-size', createGridDimensions(512, 512));
     const engine = createMapEngine(world);
     const save = createKernelSaveWithCodec(engine, SAVED_AT_ISO, worldMapSaveCodec);
+    const bytes = measureJsonBytes(save);
+    console.info(`map-storage-metric max512Bytes=${bytes}`);
 
-    expect(measureJsonBytes(save)).toBeLessThan(512 * 1024);
+    expect(bytes).toBeLessThan(512 * 1024);
   });
 
   it('does not grow serialized state according to 10,000 edit history', () => {
@@ -105,6 +108,9 @@ describe('map storage long-run budgets', () => {
 
     const after = createKernelSaveWithCodec(engine, SAVED_AT_ISO, worldMapSaveCodec);
     const afterBytes = measureJsonBytes(after);
+    console.info(
+      `map-storage-metric editBeforeBytes=${beforeBytes} editAfterBytes=${afterBytes} editDeltaBytes=${afterBytes - beforeBytes}`,
+    );
 
     expect(engine.recentCommandCount).toBe(256);
     expect(Math.abs(afterBytes - beforeBytes)).toBeLessThan(128);
