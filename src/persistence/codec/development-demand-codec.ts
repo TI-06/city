@@ -7,12 +7,7 @@ export const DEVELOPMENT_DEMAND_CODEC_VERSION = 1;
 
 export type EncodedDevelopmentDemandState = Readonly<{
   codecVersion: typeof DEVELOPMENT_DEMAND_CODEC_VERSION;
-  values: readonly [
-    version: number,
-    residential: number,
-    commercial: number,
-    industrial: number,
-  ];
+  values: readonly [version: number, residential: number, commercial: number, industrial: number];
 }>;
 
 export function encodeDevelopmentDemandState(
@@ -22,12 +17,7 @@ export function encodeDevelopmentDemandState(
 
   return {
     codecVersion: DEVELOPMENT_DEMAND_CODEC_VERSION,
-    values: [
-      validated.version,
-      validated.residential,
-      validated.commercial,
-      validated.industrial,
-    ],
+    values: [validated.version, validated.residential, validated.commercial, validated.industrial],
   };
 }
 
