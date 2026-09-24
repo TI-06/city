@@ -23,11 +23,7 @@ export function gridCellCount(dimensions: GridDimensions): number {
   return validated.width * validated.height;
 }
 
-export function assertGridCoordinate(
-  dimensions: GridDimensions,
-  x: number,
-  y: number,
-): void {
+export function assertGridCoordinate(dimensions: GridDimensions, x: number, y: number): void {
   createGridDimensions(dimensions.width, dimensions.height);
 
   if (
