@@ -4,9 +4,7 @@ import {
   type RoadAccessIndex,
 } from '../../../src/simulation/roads/road-access-index';
 import { createRoadNetworkState } from '../../../src/simulation/roads/road-network-state';
-import {
-  isZonedCellRoadAccessible,
-} from '../../../src/simulation/zoning/zoning-development-access';
+import { isZonedCellRoadAccessible } from '../../../src/simulation/zoning/zoning-development-access';
 import {
   ZoneCode,
   createEmptyZoning,
@@ -76,20 +74,16 @@ describe('zoning development road access', () => {
     expect(isZonedCellRoadAccessible(zoning, index, 4, 5)).toBe(false);
   });
 
-  it.each([
-    ZoneCode.RESIDENTIAL,
-    ZoneCode.COMMERCIAL,
-    ZoneCode.INDUSTRIAL,
-  ] as const)('treats zone %s as accessible when next to a road', (zone) => {
-    const dimensions = createGridDimensions(16, 16);
-    const zoning = createZoningState(
-      1,
-      createEmptyZoning(dimensions).grid.withCell(4, 5, zone),
-    );
-    const index = createRoadAccessIndex(createRoadFixture());
+  it.each([ZoneCode.RESIDENTIAL, ZoneCode.COMMERCIAL, ZoneCode.INDUSTRIAL] as const)(
+    'treats zone %s as accessible when next to a road',
+    (zone) => {
+      const dimensions = createGridDimensions(16, 16);
+      const zoning = createZoningState(1, createEmptyZoning(dimensions).grid.withCell(4, 5, zone));
+      const index = createRoadAccessIndex(createRoadFixture());
 
-    expect(isZonedCellRoadAccessible(zoning, index, 4, 5)).toBe(true);
-  });
+      expect(isZonedCellRoadAccessible(zoning, index, 4, 5)).toBe(true);
+    },
+  );
 
   it('keeps a designated zone inaccessible when no orthogonal road exists', () => {
     const dimensions = createGridDimensions(16, 16);
