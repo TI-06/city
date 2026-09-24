@@ -28,7 +28,7 @@ export function encodeRoadNetworkState(state: RoadNetworkState): EncodedRoadNetw
 export function decodeRoadNetworkState(saved: EncodedRoadNetworkState): RoadNetworkState {
   if (saved.codecVersion !== ROAD_NETWORK_CODEC_VERSION) {
     throw new RangeError(
-      `Unsupported road network codec version: ${saved.codecVersion}; expected ${ROAD_NETWORK_CODEC_VERSION}`,
+      `Unsupported road network codec version; expected ${ROAD_NETWORK_CODEC_VERSION}`,
     );
   }
 
