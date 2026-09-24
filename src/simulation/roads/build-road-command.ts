@@ -1,10 +1,7 @@
 import type { CommandHandler } from '../core/command-handler';
 import type { CityWorldState } from '../world/city-world-state';
 import { applyRoadBuild } from './apply-road-build';
-import {
-  planRoadBuild,
-  type RoadGridPoint,
-} from './road-build-plan';
+import { planRoadBuild, type RoadGridPoint } from './road-build-plan';
 
 export type BuildRoadPathPayload = Readonly<{
   cells: readonly RoadGridPoint[];
