@@ -14,22 +14,26 @@ export type EncodedRoadNetworkState = Readonly<{
   edges: readonly (readonly [id: number, nodeA: number, nodeB: number])[];
 }>;
 
-export function encodeRoadNetworkState(state: RoadNetworkState): EncodedRoadNetworkState {
+export function encodeRoadNetworkState(
+  state: RoadNetworkState,
+): EncodedRoadNetworkState {
   return {
     codecVersion: ROAD_NETWORK_CODEC_VERSION,
     topologyVersion: state.topologyVersion,
     nextNodeId: state.nextNodeId,
     nextEdgeId: state.nextEdgeId,
     nodes: state.nodes.map((node) => [node.id, node.x, node.y] as const),
-    edges: state.edges.map((edge) => [edge.id, edge.nodeA, edge.nodeB] as const),
+    edges: state.edges.map(
+      (edge) => [edge.id, edge.nodeA, edge.nodeB] as const,
+    ),
   };
 }
 
-export function decodeRoadNetworkState(saved: EncodedRoadNetworkState): RoadNetworkState {
+export function decodeRoadNetworkState(
+  saved: EncodedRoadNetworkState,
+): RoadNetworkState {
   if (saved.codecVersion !== ROAD_NETWORK_CODEC_VERSION) {
-    throw new RangeError(
-      'Unsupported road network codec version; expected 1',
-    );
+    throw new RangeError('Unsupported road network codec version; expected 1');
   }
 
   return createRoadNetworkState({
