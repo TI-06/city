@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { measureJsonBytes } from '../../../src/shared/serialization/measure-json-bytes';
 import { ORDINARY_RESPONSE_TARGET_BYTES } from '../../../src/shared/transport/command-budget';
 import type { GameCommand, MutationResponse } from '../../../src/shared/transport/game-command';
+import { createBuildingState } from '../../../src/simulation/buildings/building-state';
 import { SimulationEngine } from '../../../src/simulation/core/simulation-engine';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
 import { TerrainCode } from '../../../src/simulation/map/world-map-state';
@@ -161,6 +162,31 @@ describe('BUILD_ROAD_PATH command', () => {
         ]),
       ),
     ).toThrow(/zone.*road|overlap/i);
+
+    expect(engine.state).toEqual(before);
+    expect(engine.recentCommandCount).toBe(0);
+  });
+
+  it('rejects road construction through an existing building before state commit', () => {
+    const base = createStarterCityWorld('road-building-conflict');
+    const buildings = createBuildingState({
+      version: 1,
+      nextBuildingId: 2,
+      buildings: [{ id: 1, x: 1, y: 0, use: 'residential', level: 1 }],
+    });
+    const engine = createEngine(
+      createCityWorldState(base.map, base.roads, base.zoning, buildings, base.developmentDemand),
+    );
+    const before = engine.state;
+
+    expect(() =>
+      engine.dispatch(
+        buildCommand('road-building-conflict', 0, [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ]),
+      ),
+    ).toThrow(/building.*road|overlap/i);
 
     expect(engine.state).toEqual(before);
     expect(engine.recentCommandCount).toBe(0);

@@ -7,6 +7,8 @@ import {
   type EncodedCityWorldState,
 } from '../../../src/persistence/codec/city-world-codec';
 import { worldMapSaveCodec } from '../../../src/persistence/codec/world-map-codec';
+import { createBuildingState } from '../../../src/simulation/buildings/building-state';
+import { createDevelopmentDemandState } from '../../../src/simulation/development/development-demand-state';
 import { ChunkedByteGrid } from '../../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
 import { createStarterWorldMap } from '../../../src/simulation/map/starter-map-generator';
@@ -72,7 +74,7 @@ function findLandCell(
 }
 
 describe('city world codec', () => {
-  it('creates a deterministic starter city with empty roads and zoning', () => {
+  it('creates a deterministic starter city with empty roads, zoning, buildings, and demand', () => {
     const city = createStarterCityWorld('city-world-seed');
 
     expect(city.roads).toEqual({
@@ -85,6 +87,17 @@ describe('city world codec', () => {
     expect(city.zoning.version).toBe(0);
     expect(city.zoning.grid.dimensions).toEqual(city.map.dimensions);
     expect(city.zoning.grid.get(0, 0)).toBe(ZoneCode.NONE);
+    expect(city.buildings).toEqual({
+      version: 0,
+      nextBuildingId: 1,
+      buildings: [],
+    });
+    expect(city.developmentDemand).toEqual({
+      version: 0,
+      residential: 60,
+      commercial: 60,
+      industrial: 60,
+    });
     expect(city.map.mapSeed).toBe('city-world-seed');
   });
 
@@ -172,7 +185,135 @@ describe('city world codec', () => {
     expect(() => createCityWorldState(map, roads, zoning)).toThrow(/zone.*road/i);
   });
 
-  it('round-trips map terrain, road tuples, and zoning bytes', () => {
+  it('rejects a building outside map bounds', () => {
+    const map = createStarterWorldMap('building-bounds');
+    const buildings = createBuildingState({
+      version: 1,
+      nextBuildingId: 2,
+      buildings: [
+        {
+          id: 1,
+          x: map.dimensions.width,
+          y: 0,
+          use: 'residential',
+          level: 1,
+        },
+      ],
+    });
+
+    expect(() =>
+      createCityWorldState(
+        map,
+        createRoadNetworkState({
+          topologyVersion: 0,
+          nextNodeId: 1,
+          nextEdgeId: 1,
+          nodes: [],
+          edges: [],
+        }),
+        undefined,
+        buildings,
+      ),
+    ).toThrow(/grid coordinate/i);
+  });
+
+  it('rejects a building placed on water', () => {
+    const map = createStarterWorldMap('building-water');
+    const water = findWaterCell(map);
+    const buildings = createBuildingState({
+      version: 1,
+      nextBuildingId: 2,
+      buildings: [
+        {
+          id: 1,
+          x: water.x,
+          y: water.y,
+          use: 'commercial',
+          level: 1,
+        },
+      ],
+    });
+
+    expect(() =>
+      createCityWorldState(
+        map,
+        createRoadNetworkState({
+          topologyVersion: 0,
+          nextNodeId: 1,
+          nextEdgeId: 1,
+          nodes: [],
+          edges: [],
+        }),
+        undefined,
+        buildings,
+      ),
+    ).toThrow(/building.*land/i);
+  });
+
+  it('rejects a building that overlaps a road', () => {
+    const map = createStarterWorldMap('building-road');
+    const buildings = createBuildingState({
+      version: 1,
+      nextBuildingId: 2,
+      buildings: [
+        {
+          id: 1,
+          x: 0,
+          y: 0,
+          use: 'industrial',
+          level: 1,
+        },
+      ],
+    });
+
+    expect(() => createCityWorldState(map, createRoadFixture(), undefined, buildings)).toThrow(
+      /building.*road/i,
+    );
+  });
+
+  it('allows an existing building to survive zoning changes or zone clearing', () => {
+    const map = createStarterWorldMap('building-rezone');
+    const cell = findLandCell(map);
+    const buildings = createBuildingState({
+      version: 1,
+      nextBuildingId: 2,
+      buildings: [
+        {
+          id: 1,
+          x: cell.x,
+          y: cell.y,
+          use: 'residential',
+          level: 1,
+        },
+      ],
+    });
+    const zoning = createZoningState(
+      2,
+      ChunkedByteGrid.filled(map.dimensions, ZoneCode.NONE).withCell(
+        cell.x,
+        cell.y,
+        ZoneCode.INDUSTRIAL,
+      ),
+    );
+
+    const city = createCityWorldState(
+      map,
+      createRoadNetworkState({
+        topologyVersion: 0,
+        nextNodeId: 1,
+        nextEdgeId: 1,
+        nodes: [],
+        edges: [],
+      }),
+      zoning,
+      buildings,
+    );
+
+    expect(city.buildings.buildings[0]?.use).toBe('residential');
+    expect(city.zoning.grid.get(cell.x, cell.y)).toBe(ZoneCode.INDUSTRIAL);
+  });
+
+  it('round-trips map terrain, road tuples, zoning, buildings, and demand', () => {
     const map = createStarterWorldMap('round-trip');
     const roads = createRoadFixture();
     const land = findLandCell(map, new Set(['0,0', '1,0']));
@@ -184,7 +325,26 @@ describe('city world codec', () => {
         ZoneCode.INDUSTRIAL,
       ),
     );
-    const city = createCityWorldState(map, roads, zoning);
+    const buildings = createBuildingState({
+      version: 2,
+      nextBuildingId: 2,
+      buildings: [
+        {
+          id: 1,
+          x: land.x,
+          y: land.y,
+          use: 'industrial',
+          level: 1,
+        },
+      ],
+    });
+    const demand = createDevelopmentDemandState({
+      version: 5,
+      residential: 10,
+      commercial: 20,
+      industrial: 90,
+    });
+    const city = createCityWorldState(map, roads, zoning, buildings, demand);
 
     const encoded = encodeCityWorldState(city);
     const restored = decodeCityWorldState(encoded);
@@ -192,6 +352,8 @@ describe('city world codec', () => {
     expect(encoded.codecVersion).toBe(CITY_WORLD_CODEC_VERSION);
     expect(restored.roads).toEqual(city.roads);
     expect(restored.zoning.version).toBe(3);
+    expect(restored.buildings).toEqual(city.buildings);
+    expect(restored.developmentDemand).toEqual(demand);
     expect(restored.zoning.grid.copyChunks().map((chunk) => Array.from(chunk))).toEqual(
       city.zoning.grid.copyChunks().map((chunk) => Array.from(chunk)),
     );
@@ -266,6 +428,8 @@ describe('city world codec', () => {
     expect(serialized).not.toContain('RoadAccessIndex');
     expect(encoded.map.terrain.chunks.every((chunk) => typeof chunk === 'string')).toBe(true);
     expect(encoded.zoning.grid.chunks.every((chunk) => typeof chunk === 'string')).toBe(true);
+    expect(encoded.buildings.buildings).toEqual([]);
+    expect(encoded.developmentDemand.values).toEqual([0, 60, 60, 60]);
     expect(encoded.roads.nodes).toEqual([
       [1, 0, 0],
       [2, 1, 0],

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { measureJsonBytes } from '../../../src/shared/serialization/measure-json-bytes';
 import { ORDINARY_RESPONSE_TARGET_BYTES } from '../../../src/shared/transport/command-budget';
 import type { GameCommand, MutationResponse } from '../../../src/shared/transport/game-command';
+import { createBuildingState } from '../../../src/simulation/buildings/building-state';
 import { SimulationEngine } from '../../../src/simulation/core/simulation-engine';
 import { ChunkedByteGrid } from '../../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
@@ -230,6 +231,31 @@ describe('SET_ZONE_CELLS command', () => {
 
     expect(() => engine.dispatch(invalid)).toThrow(ZoningValidationError);
     expect(engine.state).toEqual(before);
+  });
+
+  it('allows rezoning and clearing a cell occupied by an existing building', () => {
+    const base = createStarterCityWorld('zone-building');
+    const buildings = createBuildingState({
+      version: 1,
+      nextBuildingId: 2,
+      buildings: [{ id: 1, x: 0, y: 0, use: 'residential', level: 1 }],
+    });
+    const engine = createEngine(
+      createCityWorldState(base.map, base.roads, base.zoning, buildings, base.developmentDemand),
+    );
+    const buildingsBefore = engine.state.world.buildings;
+
+    engine.dispatch(
+      zoneCommand('zone-building-commercial', 0, ZoneCode.COMMERCIAL, [{ x: 0, y: 0 }]),
+    );
+    expect(engine.state.world.zoning.grid.get(0, 0)).toBe(ZoneCode.COMMERCIAL);
+    expect(engine.state.world.buildings).toBe(buildingsBefore);
+    expect(engine.state.world.buildings.buildings[0]?.id).toBe(1);
+
+    engine.dispatch(zoneCommand('zone-building-clear', 1, ZoneCode.NONE, [{ x: 0, y: 0 }]));
+    expect(engine.state.world.zoning.grid.get(0, 0)).toBe(ZoneCode.NONE);
+    expect(engine.state.world.buildings).toBe(buildingsBefore);
+    expect(engine.state.world.buildings.buildings[0]?.use).toBe('residential');
   });
 
   it('keeps zoning version and object identity for an all-existing no-op', () => {
