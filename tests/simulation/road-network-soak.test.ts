@@ -8,7 +8,10 @@ import {
 } from '../../src/simulation/core/kernel-save';
 import { SimulationEngine } from '../../src/simulation/core/simulation-engine';
 import { ChunkedByteGrid } from '../../src/simulation/map/chunked-byte-grid';
-import { createGridDimensions, type GridDimensions } from '../../src/simulation/map/grid-dimensions';
+import {
+  createGridDimensions,
+  type GridDimensions,
+} from '../../src/simulation/map/grid-dimensions';
 import {
   TerrainCode,
   WORLD_MAP_GENERATOR_VERSION,
@@ -83,10 +86,7 @@ function createSnakePath(dimensions: GridDimensions): readonly RoadGridPoint[] {
   return points;
 }
 
-function buildSnakeUntil(
-  engine: SimulationEngine<CityWorldState>,
-  targetNodeCount: number,
-): void {
+function buildSnakeUntil(engine: SimulationEngine<CityWorldState>, targetNodeCount: number): void {
   const points = createSnakePath(engine.state.world.map.dimensions);
   let nextPointIndex = 0;
   let commandIndex = 0;
