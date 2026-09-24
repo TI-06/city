@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  decodeBytesBase64,
-  encodeBytesBase64,
-} from '../../../src/persistence/codec/base64-bytes';
+import { decodeBytesBase64, encodeBytesBase64 } from '../../../src/persistence/codec/base64-bytes';
 
 describe('Base64 byte codec', () => {
   it.each([
