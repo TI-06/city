@@ -175,13 +175,7 @@ describe('BUILD_ROAD_PATH command', () => {
       buildings: [{ id: 1, x: 1, y: 0, use: 'residential', level: 1 }],
     });
     const engine = createEngine(
-      createCityWorldState(
-        base.map,
-        base.roads,
-        base.zoning,
-        buildings,
-        base.developmentDemand,
-      ),
+      createCityWorldState(base.map, base.roads, base.zoning, buildings, base.developmentDemand),
     );
     const before = engine.state;
 
