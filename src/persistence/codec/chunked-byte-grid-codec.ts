@@ -28,15 +28,11 @@ export function encodeChunkedByteGrid(grid: ChunkedByteGrid): EncodedChunkedByte
 
 export function decodeChunkedByteGrid(snapshot: EncodedChunkedByteGrid): ChunkedByteGrid {
   if (snapshot.codecVersion !== BYTE_GRID_CODEC_VERSION) {
-    throw new RangeError(
-      `Unsupported byte grid codec version: ${snapshot.codecVersion}; expected ${BYTE_GRID_CODEC_VERSION}`,
-    );
+    throw new RangeError('Unsupported byte grid codec version');
   }
 
   if (snapshot.chunkSize !== BYTE_GRID_CHUNK_SIZE) {
-    throw new RangeError(
-      `Unsupported chunk size: ${snapshot.chunkSize}; expected ${BYTE_GRID_CHUNK_SIZE}`,
-    );
+    throw new RangeError('Unsupported chunk size');
   }
 
   const dimensions = createGridDimensions(snapshot.width, snapshot.height);
