@@ -21,9 +21,9 @@ describe('world map codec', () => {
     expect(restored.generatorVersion).toBe(source.generatorVersion);
     expect(restored.mapSeed).toBe(source.mapSeed);
     expect(restored.dimensions).toEqual(source.dimensions);
-    expect(
-      restored.terrain.copyChunks().map((chunk) => Array.from(chunk)),
-    ).toEqual(source.terrain.copyChunks().map((chunk) => Array.from(chunk)));
+    expect(restored.terrain.copyChunks().map((chunk) => Array.from(chunk))).toEqual(
+      source.terrain.copyChunks().map((chunk) => Array.from(chunk)),
+    );
   });
 
   it('exposes a WorldSaveCodec-compatible codec object', () => {
@@ -41,6 +41,8 @@ describe('world map codec', () => {
       generatorVersion: WORLD_MAP_GENERATOR_VERSION + 1,
     } as unknown as EncodedWorldMapState;
 
-    expect(() => decodeWorldMapState(invalid)).toThrow(/unsupported world map generator version/i);
+    expect(() => decodeWorldMapState(invalid)).toThrow(
+      /unsupported world map generator version/i,
+    );
   });
 });
