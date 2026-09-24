@@ -1,0 +1,22 @@
+name: format-inspect
+
+on:
+  push:
+    branches:
+      - feat/road-network-core
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Show exact Prettier diff
+        run: |
+          npx prettier --write src/persistence/codec/road-network-codec.ts
+          git diff -- src/persistence/codec/road-network-codec.ts
