@@ -13,16 +13,12 @@ function coordinateKey(x: number, y: number): string {
 export function createRoadAccessIndex(roads: RoadNetworkState): RoadAccessIndex {
   const occupied = new Set(roads.nodes.map((node) => coordinateKey(node.x, node.y)));
 
-  const hasRoadAt = (x: number, y: number): boolean =>
-    occupied.has(coordinateKey(x, y));
+  const hasRoadAt = (x: number, y: number): boolean => occupied.has(coordinateKey(x, y));
 
   return {
     topologyVersion: roads.topologyVersion,
     hasRoadAt,
     hasAdjacentRoad: (x, y) =>
-      hasRoadAt(x, y - 1) ||
-      hasRoadAt(x - 1, y) ||
-      hasRoadAt(x + 1, y) ||
-      hasRoadAt(x, y + 1),
+      hasRoadAt(x, y - 1) || hasRoadAt(x - 1, y) || hasRoadAt(x + 1, y) || hasRoadAt(x, y + 1),
   };
 }
