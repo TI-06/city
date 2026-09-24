@@ -6,7 +6,10 @@ import {
   restoreKernelStateWithCodec,
 } from '../../src/simulation/core/kernel-save';
 import { SimulationEngine } from '../../src/simulation/core/simulation-engine';
-import { createBuildingState, type BuildingUse } from '../../src/simulation/buildings/building-state';
+import {
+  createBuildingState,
+  type BuildingUse,
+} from '../../src/simulation/buildings/building-state';
 import { createCompanyState } from '../../src/simulation/economy/company-state';
 import { ChunkedByteGrid } from '../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../src/simulation/map/grid-dimensions';
@@ -32,8 +35,7 @@ const SAVED_AT_ISO = '2026-09-25T00:00:00.000Z';
 const RESIDENTIAL_BUILDINGS = 2_500;
 const COMMERCIAL_BUILDINGS = 1_250;
 const INDUSTRIAL_BUILDINGS = 1_250;
-const TOTAL_BUILDINGS =
-  RESIDENTIAL_BUILDINGS + COMMERCIAL_BUILDINGS + INDUSTRIAL_BUILDINGS;
+const TOTAL_BUILDINGS = RESIDENTIAL_BUILDINGS + COMMERCIAL_BUILDINGS + INDUSTRIAL_BUILDINGS;
 
 function buildingUseAt(index: number): BuildingUse {
   if (index < RESIDENTIAL_BUILDINGS) return 'residential';
@@ -82,21 +84,18 @@ function createFullyOccupiedWorld(): CityWorldState {
   const companies = createCompanyState({
     version: COMMERCIAL_BUILDINGS + INDUSTRIAL_BUILDINGS,
     nextCompanyId: COMMERCIAL_BUILDINGS + INDUSTRIAL_BUILDINGS + 1,
-    companies: Array.from(
-      { length: COMMERCIAL_BUILDINGS + INDUSTRIAL_BUILDINGS },
-      (_, index) => {
-        const buildingId = firstBusinessBuildingId + index;
-        const isCommercial = index < COMMERCIAL_BUILDINGS;
-        return {
-          id: index + 1,
-          buildingId,
-          kind: isCommercial ? ('commercial' as const) : ('industrial' as const),
-          jobCapacity: isCommercial
-            ? COMMERCIAL_LEVEL_1_JOB_CAPACITY
-            : INDUSTRIAL_LEVEL_1_JOB_CAPACITY,
-        };
-      },
-    ),
+    companies: Array.from({ length: COMMERCIAL_BUILDINGS + INDUSTRIAL_BUILDINGS }, (_, index) => {
+      const buildingId = firstBusinessBuildingId + index;
+      const isCommercial = index < COMMERCIAL_BUILDINGS;
+      return {
+        id: index + 1,
+        buildingId,
+        kind: isCommercial ? ('commercial' as const) : ('industrial' as const),
+        jobCapacity: isCommercial
+          ? COMMERCIAL_LEVEL_1_JOB_CAPACITY
+          : INDUSTRIAL_LEVEL_1_JOB_CAPACITY,
+      };
+    }),
   });
 
   return createCityWorldState(
@@ -176,7 +175,9 @@ describe('population and jobs long-run persistence', () => {
     );
     expect(Math.abs(deltaBytes)).toBeLessThan(128);
 
-    const householdIds = new Set(engine.state.world.households.households.map((entity) => entity.id));
+    const householdIds = new Set(
+      engine.state.world.households.households.map((entity) => entity.id),
+    );
     const householdBuildings = new Set(
       engine.state.world.households.households.map((entity) => entity.homeBuildingId),
     );
