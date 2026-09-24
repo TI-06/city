@@ -86,7 +86,9 @@ export function createCityWorldState(
   }
 
   const validatedBuildings = createBuildingState(buildings);
-  const buildingById = new Map(validatedBuildings.buildings.map((building) => [building.id, building]));
+  const buildingById = new Map(
+    validatedBuildings.buildings.map((building) => [building.id, building]),
+  );
 
   for (const building of validatedBuildings.buildings) {
     assertGridCoordinate(map.dimensions, building.x, building.y);
@@ -129,9 +131,7 @@ export function createCityWorldState(
       );
     }
     if (company.kind !== building.use) {
-      throw new RangeError(
-        `Company ${company.id} kind must match building use ${building.use}`,
-      );
+      throw new RangeError(`Company ${company.id} kind must match building use ${building.use}`);
     }
   }
 
