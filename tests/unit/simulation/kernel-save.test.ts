@@ -113,11 +113,7 @@ describe('kernel save and restore', () => {
     });
     engine.step(3);
 
-    const save = createKernelSaveWithCodec(
-      engine,
-      '2026-09-24T00:00:00.000Z',
-      runtimeWorldCodec,
-    );
+    const save = createKernelSaveWithCodec(engine, '2026-09-24T00:00:00.000Z', runtimeWorldCodec);
     const restored = restoreKernelStateWithCodec(save, runtimeWorldCodec);
 
     expect(save.state.world).toEqual({
