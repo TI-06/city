@@ -20,9 +20,7 @@ import {
   WORLD_MAP_GENERATOR_VERSION,
   type WorldMapState,
 } from '../../../src/simulation/map/world-map-state';
-import {
-  createHouseholdState,
-} from '../../../src/simulation/population/household-state';
+import { createHouseholdState } from '../../../src/simulation/population/household-state';
 import {
   createOccupancyGrowthSystem,
   COMMERCIAL_LEVEL_1_JOB_CAPACITY,
@@ -246,10 +244,7 @@ describe('occupancy growth system', () => {
     );
 
     expect(
-      derivePopulationJobsStatistics(
-        engine.state.world.households,
-        engine.state.world.companies,
-      ),
+      derivePopulationJobsStatistics(engine.state.world.households, engine.state.world.companies),
     ).toEqual({
       population: 0,
       laborForce: 0,
