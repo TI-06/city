@@ -202,13 +202,18 @@ describe('city world codec', () => {
     });
 
     expect(() =>
-      createCityWorldState(map, createRoadNetworkState({
-        topologyVersion: 0,
-        nextNodeId: 1,
-        nextEdgeId: 1,
-        nodes: [],
-        edges: [],
-      }), undefined, buildings),
+      createCityWorldState(
+        map,
+        createRoadNetworkState({
+          topologyVersion: 0,
+          nextNodeId: 1,
+          nextEdgeId: 1,
+          nodes: [],
+          edges: [],
+        }),
+        undefined,
+        buildings,
+      ),
     ).toThrow(/grid coordinate/i);
   });
 
