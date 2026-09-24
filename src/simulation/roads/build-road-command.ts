@@ -53,9 +53,7 @@ export const buildRoadPathHandler: CommandHandler<CityWorldState> = {
   apply: (world, payload) => {
     const parsed = parseBuildRoadPathPayload(payload);
     const plan = planRoadBuild(world.map, world.roads, parsed.cells);
-    const plannedCoordinates = new Set(
-      plan.nodesToAdd.map((node) => `${node.x},${node.y}`),
-    );
+    const plannedCoordinates = new Set(plan.nodesToAdd.map((node) => `${node.x},${node.y}`));
 
     for (const node of plan.nodesToAdd) {
       if (getZoneAt(world.zoning, node.x, node.y) !== ZoneCode.NONE) {
