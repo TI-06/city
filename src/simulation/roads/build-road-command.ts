@@ -53,9 +53,21 @@ export const buildRoadPathHandler: CommandHandler<CityWorldState> = {
   apply: (world, payload) => {
     const parsed = parseBuildRoadPathPayload(payload);
     const plan = planRoadBuild(world.map, world.roads, parsed.cells);
+    const plannedCoordinates = new Set(
+      plan.nodesToAdd.map((node) => `${node.x},${node.y}`),
+    );
+
     for (const node of plan.nodesToAdd) {
       if (getZoneAt(world.zoning, node.x, node.y) !== ZoneCode.NONE) {
         throw new RangeError(`Road cell ${node.x},${node.y} cannot overlap a zone`);
+      }
+    }
+
+    for (const building of world.buildings.buildings) {
+      if (plannedCoordinates.has(`${building.x},${building.y}`)) {
+        throw new RangeError(
+          `Road cell ${building.x},${building.y} cannot overlap building ${building.id}`,
+        );
       }
     }
 
