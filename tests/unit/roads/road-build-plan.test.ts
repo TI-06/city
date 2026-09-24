@@ -15,10 +15,7 @@ import {
   type RoadNetworkState,
 } from '../../../src/simulation/roads/road-network-state';
 
-function expectValidationCode(
-  action: () => unknown,
-  code: RoadBuildValidationCode,
-): void {
+function expectValidationCode(action: () => unknown, code: RoadBuildValidationCode): void {
   try {
     action();
     throw new Error('Expected road build validation to fail');
@@ -119,22 +116,17 @@ describe('road build planning', () => {
     );
   });
 
-  it.each([
-    [{ x: 1.5, y: 0 }],
-    [{ x: Number.NaN, y: 0 }],
-    [{ x: 0, y: Number.POSITIVE_INFINITY }],
-  ])('rejects invalid coordinates', ([invalid]) => {
-    const map = createStarterWorldMap('invalid-coordinate');
+  it.each([[{ x: 1.5, y: 0 }], [{ x: Number.NaN, y: 0 }], [{ x: 0, y: Number.POSITIVE_INFINITY }]])(
+    'rejects invalid coordinates',
+    ([invalid]) => {
+      const map = createStarterWorldMap('invalid-coordinate');
 
-    expectValidationCode(
-      () =>
-        planRoadBuild(map, createEmptyRoadNetwork(), [
-          { x: 0, y: 0 },
-          invalid!,
-        ]),
-      'INVALID_COORDINATE',
-    );
-  });
+      expectValidationCode(
+        () => planRoadBuild(map, createEmptyRoadNetwork(), [{ x: 0, y: 0 }, invalid!]),
+        'INVALID_COORDINATE',
+      );
+    },
+  );
 
   it('rejects an out-of-bounds coordinate', () => {
     const map = createStarterWorldMap('out-of-bounds');
