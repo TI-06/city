@@ -1,8 +1,4 @@
-import {
-  assertGridCoordinate,
-  createGridDimensions,
-  type GridDimensions,
-} from './grid-dimensions';
+import { assertGridCoordinate, createGridDimensions, type GridDimensions } from './grid-dimensions';
 
 export const BYTE_GRID_CHUNK_SIZE = 32;
 export const BYTE_GRID_CHUNK_BYTES = BYTE_GRID_CHUNK_SIZE * BYTE_GRID_CHUNK_SIZE;
