@@ -98,7 +98,9 @@ export function createStarterCityWorld(
   dimensions?: GridDimensions,
 ): CityWorldState {
   const map =
-    dimensions === undefined ? createStarterWorldMap(seed) : createStarterWorldMap(seed, dimensions);
+    dimensions === undefined
+      ? createStarterWorldMap(seed)
+      : createStarterWorldMap(seed, dimensions);
 
   return createCityWorldState(map, createEmptyRoadNetwork());
 }
