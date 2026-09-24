@@ -12,9 +12,7 @@ import {
   restoreKernelStateWithCodec,
 } from '../../src/simulation/core/kernel-save';
 import { SimulationEngine } from '../../src/simulation/core/simulation-engine';
-import {
-  createAutomaticDevelopmentSystem,
-} from '../../src/simulation/development/automatic-development-system';
+import { createAutomaticDevelopmentSystem } from '../../src/simulation/development/automatic-development-system';
 import { createDevelopmentDemandState } from '../../src/simulation/development/development-demand-state';
 import { ChunkedByteGrid } from '../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../src/simulation/map/grid-dimensions';
