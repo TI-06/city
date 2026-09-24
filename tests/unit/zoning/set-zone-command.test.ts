@@ -241,16 +241,12 @@ describe('SET_ZONE_CELLS command', () => {
       buildings: [{ id: 1, x: 0, y: 0, use: 'residential', level: 1 }],
     });
     const engine = createEngine(
-      createCityWorldState(
-        base.map,
-        base.roads,
-        base.zoning,
-        buildings,
-        base.developmentDemand,
-      ),
+      createCityWorldState(base.map, base.roads, base.zoning, buildings, base.developmentDemand),
     );
 
-    engine.dispatch(zoneCommand('zone-building-commercial', 0, ZoneCode.COMMERCIAL, [{ x: 0, y: 0 }]));
+    engine.dispatch(
+      zoneCommand('zone-building-commercial', 0, ZoneCode.COMMERCIAL, [{ x: 0, y: 0 }]),
+    );
     expect(engine.state.world.zoning.grid.get(0, 0)).toBe(ZoneCode.COMMERCIAL);
     expect(engine.state.world.buildings).toBe(buildings);
     expect(engine.state.world.buildings.buildings[0]?.id).toBe(1);
