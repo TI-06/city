@@ -1,3 +1,13 @@
+import {
+  createBuildingState,
+  createEmptyBuildingState,
+  type BuildingState,
+} from '../buildings/building-state';
+import {
+  createDefaultDevelopmentDemand,
+  createDevelopmentDemandState,
+  type DevelopmentDemandState,
+} from '../development/development-demand-state';
 import type { RandomSeed } from '../core/seeded-random';
 import { assertGridCoordinate, type GridDimensions } from '../map/grid-dimensions';
 import { createStarterWorldMap } from '../map/starter-map-generator';
@@ -9,6 +19,8 @@ export type CityWorldState = Readonly<{
   map: WorldMapState;
   roads: RoadNetworkState;
   zoning: ZoningState;
+  buildings: BuildingState;
+  developmentDemand: DevelopmentDemandState;
 }>;
 
 function coordinateKey(x: number, y: number): string {
@@ -19,6 +31,8 @@ export function createCityWorldState(
   map: WorldMapState,
   roads: RoadNetworkState,
   zoning: ZoningState = createEmptyZoning(map.dimensions),
+  buildings: BuildingState = createEmptyBuildingState(),
+  developmentDemand: DevelopmentDemandState = createDefaultDevelopmentDemand(),
 ): CityWorldState {
   const zoningDimensions = zoning.grid.dimensions;
   if (
@@ -57,7 +71,26 @@ export function createCityWorldState(
     }
   }
 
-  return { map, roads, zoning };
+  const validatedBuildings = createBuildingState(buildings);
+  for (const building of validatedBuildings.buildings) {
+    assertGridCoordinate(map.dimensions, building.x, building.y);
+
+    if (map.terrain.get(building.x, building.y) !== TerrainCode.LAND) {
+      throw new RangeError(`Building ${building.id} must be placed on LAND terrain`);
+    }
+
+    if (roadCoordinates.has(coordinateKey(building.x, building.y))) {
+      throw new RangeError(`Building ${building.id} cannot overlap a road cell`);
+    }
+  }
+
+  return {
+    map,
+    roads,
+    zoning,
+    buildings: validatedBuildings,
+    developmentDemand: createDevelopmentDemandState(developmentDemand),
+  };
 }
 
 export function createStarterCityWorld(
@@ -65,9 +98,7 @@ export function createStarterCityWorld(
   dimensions?: GridDimensions,
 ): CityWorldState {
   const map =
-    dimensions === undefined
-      ? createStarterWorldMap(seed)
-      : createStarterWorldMap(seed, dimensions);
+    dimensions === undefined ? createStarterWorldMap(seed) : createStarterWorldMap(seed, dimensions);
 
   return createCityWorldState(map, createEmptyRoadNetwork());
 }
