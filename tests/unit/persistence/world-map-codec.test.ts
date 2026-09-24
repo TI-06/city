@@ -26,6 +26,16 @@ describe('world map codec', () => {
     );
   });
 
+  it('rejects a runtime map whose declared dimensions disagree with terrain', () => {
+    const source = createStarterWorldMap('dimension-mismatch');
+    const inconsistent = {
+      ...source,
+      dimensions: createGridDimensions(64, 64),
+    };
+
+    expect(() => encodeWorldMapState(inconsistent)).toThrow(/dimensions.*terrain/i);
+  });
+
   it('exposes a WorldSaveCodec-compatible codec object', () => {
     const source = createStarterWorldMap('codec-object');
     const restored = worldMapSaveCodec.decode(worldMapSaveCodec.encode(source));
