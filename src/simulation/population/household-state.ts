@@ -55,9 +55,7 @@ export function createHouseholdState(input: HouseholdStateInput): HouseholdState
     householdIds.add(household.id);
 
     if (homeBuildingIds.has(household.homeBuildingId)) {
-      throw new RangeError(
-        `Duplicate household home building ID: ${household.homeBuildingId}`,
-      );
+      throw new RangeError(`Duplicate household home building ID: ${household.homeBuildingId}`);
     }
     homeBuildingIds.add(household.homeBuildingId);
 
