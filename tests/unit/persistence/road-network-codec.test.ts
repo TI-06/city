@@ -73,6 +73,35 @@ describe('road network codec', () => {
     ).toThrow(/codec version/i);
   });
 
+  it('rejects a node tuple with extra fields instead of silently truncating it', () => {
+    const encoded = encodeRoadNetworkState(createFixture());
+    const invalid = {
+      ...encoded,
+      nodes: [[1, 10, 10, 999]],
+      edges: [],
+      nextNodeId: 2,
+      nextEdgeId: 1,
+    } as unknown as EncodedRoadNetworkState;
+
+    expect(() => decodeRoadNetworkState(invalid)).toThrow(/node tuple.*3/i);
+  });
+
+  it('rejects an edge tuple with extra fields instead of silently truncating it', () => {
+    const encoded = encodeRoadNetworkState(createFixture());
+    const invalid = {
+      ...encoded,
+      nodes: [
+        [1, 10, 10],
+        [2, 11, 10],
+      ],
+      edges: [[1, 1, 2, 999]],
+      nextNodeId: 3,
+      nextEdgeId: 2,
+    } as unknown as EncodedRoadNetworkState;
+
+    expect(() => decodeRoadNetworkState(invalid)).toThrow(/edge tuple.*3/i);
+  });
+
   it('rejects duplicate node ids from durable tuples', () => {
     const encoded = encodeRoadNetworkState(createFixture());
 
