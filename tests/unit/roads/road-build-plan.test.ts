@@ -122,7 +122,7 @@ describe('road build planning', () => {
       const map = createStarterWorldMap('invalid-coordinate');
 
       expectValidationCode(
-        () => planRoadBuild(map, createEmptyRoadNetwork(), [{ x: 0, y: 0 }, invalid!]),
+        () => planRoadBuild(map, createEmptyRoadNetwork(), [{ x: 0, y: 0 }, invalid]),
         'INVALID_COORDINATE',
       );
     },
