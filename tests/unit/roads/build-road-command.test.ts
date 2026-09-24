@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { measureJsonBytes } from '../../../src/shared/serialization/measure-json-bytes';
 import { ORDINARY_RESPONSE_TARGET_BYTES } from '../../../src/shared/transport/command-budget';
-import type {
-  GameCommand,
-  MutationResponse,
-} from '../../../src/shared/transport/game-command';
+import type { GameCommand, MutationResponse } from '../../../src/shared/transport/game-command';
 import { SimulationEngine } from '../../../src/simulation/core/simulation-engine';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
 import { TerrainCode } from '../../../src/simulation/map/world-map-state';
@@ -125,12 +122,7 @@ describe('BUILD_ROAD_PATH command', () => {
       waterCell.x + 1 < engine.state.world.map.dimensions.width ? waterCell.x + 1 : waterCell.x - 1;
 
     expect(() =>
-      engine.dispatch(
-        buildCommand('road-water', 0, [
-          waterCell,
-          { x: neighborX, y: waterCell.y },
-        ]),
-      ),
+      engine.dispatch(buildCommand('road-water', 0, [waterCell, { x: neighborX, y: waterCell.y }])),
     ).toThrow(RoadBuildValidationError);
 
     expect(engine.state).toEqual(before);
@@ -185,10 +177,7 @@ describe('BUILD_ROAD_PATH command', () => {
   });
 
   it('keeps the maximum 256-cell command response below the ordinary response budget', () => {
-    const world = createStarterCityWorld(
-      'road-max-response',
-      createGridDimensions(256, 16),
-    );
+    const world = createStarterCityWorld('road-max-response', createGridDimensions(256, 16));
     const engine = createEngine(world);
     const cells = Array.from({ length: 256 }, (_, x) => ({ x, y: 0 }));
 
