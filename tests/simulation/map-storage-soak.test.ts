@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { assertSaveWithinBudget, SAVE_BUDGET_STARTER_BYTES } from '../../src/persistence/save/save-budget';
+import {
+  assertSaveWithinBudget,
+  SAVE_BUDGET_STARTER_BYTES,
+} from '../../src/persistence/save/save-budget';
 import { worldMapSaveCodec } from '../../src/persistence/codec/world-map-codec';
 import { measureJsonBytes } from '../../src/shared/serialization/measure-json-bytes';
 import type { GameCommand } from '../../src/shared/transport/game-command';
@@ -12,7 +15,10 @@ import { TerrainCode, type WorldMapState } from '../../src/simulation/map/world-
 
 const SAVED_AT_ISO = '2026-09-24T00:00:00.000Z';
 
-function createMapEngine(world: WorldMapState, handlers: readonly CommandHandler<WorldMapState>[] = []) {
+function createMapEngine(
+  world: WorldMapState,
+  handlers: readonly CommandHandler<WorldMapState>[] = [],
+) {
   return SimulationEngine.create<WorldMapState>({
     world,
     seed: `engine:${world.mapSeed}`,
