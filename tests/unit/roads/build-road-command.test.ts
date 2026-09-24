@@ -12,9 +12,11 @@ import {
 } from '../../../src/simulation/roads/build-road-command';
 import { RoadBuildValidationError } from '../../../src/simulation/roads/road-build-plan';
 import {
+  createCityWorldState,
   createStarterCityWorld,
   type CityWorldState,
 } from '../../../src/simulation/world/city-world-state';
+import { ZoneCode, createZoningState } from '../../../src/simulation/zoning/zoning-state';
 
 function createEngine(world = createStarterCityWorld('road-command')) {
   return SimulationEngine.create<CityWorldState>({
@@ -143,6 +145,28 @@ describe('BUILD_ROAD_PATH command', () => {
     ).toThrow(RoadBuildValidationError);
 
     expect(engine.state).toEqual(before);
+  });
+
+  it('rejects road construction through an existing zone before state commit', () => {
+    const base = createStarterCityWorld('road-zone-conflict');
+    const zoning = createZoningState(
+      1,
+      base.zoning.grid.withCell(1, 0, ZoneCode.RESIDENTIAL),
+    );
+    const engine = createEngine(createCityWorldState(base.map, base.roads, zoning));
+    const before = engine.state;
+
+    expect(() =>
+      engine.dispatch(
+        buildCommand('road-zone-conflict', 0, [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ]),
+      ),
+    ).toThrow(/zone.*road|overlap/i);
+
+    expect(engine.state).toEqual(before);
+    expect(engine.recentCommandCount).toBe(0);
   });
 
   it('treats an all-existing path as a road-topology no-op while revision advances', () => {
