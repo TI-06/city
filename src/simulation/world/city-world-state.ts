@@ -3,12 +3,7 @@ import { assertGridCoordinate, type GridDimensions } from '../map/grid-dimension
 import { createStarterWorldMap } from '../map/starter-map-generator';
 import { TerrainCode, type WorldMapState } from '../map/world-map-state';
 import { createEmptyRoadNetwork, type RoadNetworkState } from '../roads/road-network-state';
-import {
-  ZoneCode,
-  createEmptyZoning,
-  getZoneAt,
-  type ZoningState,
-} from '../zoning/zoning-state';
+import { ZoneCode, createEmptyZoning, getZoneAt, type ZoningState } from '../zoning/zoning-state';
 
 export type CityWorldState = Readonly<{
   map: WorldMapState;
