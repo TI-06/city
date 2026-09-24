@@ -1,3 +1,4 @@
+import type { Building } from '../buildings/building-state';
 import { createCompanyState, type CompanyKind } from '../economy/company-state';
 import type { SimulationSystem } from '../core/simulation-system';
 import { createHouseholdState } from './household-state';
@@ -31,6 +32,9 @@ function collectCompanyCandidates(world: CityWorldState): number[] {
 }
 
 export function createOccupancyGrowthSystem(): SimulationSystem<CityWorldState> {
+  let cachedBuildingVersion: number | undefined;
+  let buildingById = new Map<number, Building>();
+
   let residentialBuildingVersion: number | undefined;
   let householdVersion: number | undefined;
   let residentialCandidates: number[] = [];
@@ -42,6 +46,13 @@ export function createOccupancyGrowthSystem(): SimulationSystem<CityWorldState> 
   return {
     id: 'occupancy-growth',
     step: (world, context) => {
+      if (cachedBuildingVersion !== world.buildings.version) {
+        buildingById = new Map(
+          world.buildings.buildings.map((building) => [building.id, building]),
+        );
+        cachedBuildingVersion = world.buildings.version;
+      }
+
       if (
         residentialBuildingVersion !== world.buildings.version ||
         householdVersion !== world.households.version
@@ -99,7 +110,7 @@ export function createOccupancyGrowthSystem(): SimulationSystem<CityWorldState> 
       if (companyCandidates.length > 0) {
         const candidateIndex = context.random.nextUint32() % companyCandidates.length;
         const buildingId = companyCandidates[candidateIndex]!;
-        const building = world.buildings.buildings.find((candidate) => candidate.id === buildingId);
+        const building = buildingById.get(buildingId);
 
         if (building === undefined || building.use === 'residential') {
           throw new RangeError(
