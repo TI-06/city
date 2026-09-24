@@ -104,11 +104,11 @@ describe('kernel save and restore', () => {
   });
 
   it('encodes and restores a runtime world through an explicit world codec', () => {
-    const engine = SimulationEngine.create({
+    const engine = SimulationEngine.create<RuntimeCodecWorld>({
       world: {
         name: 'codec-world',
         bytes: Uint8Array.from([0, 1, 2, 127, 255]),
-      } satisfies RuntimeCodecWorld,
+      },
       seed: 'codec-save-seed',
     });
     engine.step(3);
