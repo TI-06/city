@@ -3,8 +3,11 @@ import type { GameCommand } from '../../../src/shared/transport/game-command';
 import type { CommandHandler } from '../../../src/simulation/core/command-handler';
 import {
   createKernelSave,
+  createKernelSaveWithCodec,
   KERNEL_SAVE_VERSION,
   restoreKernelState,
+  restoreKernelStateWithCodec,
+  type WorldSaveCodec,
 } from '../../../src/simulation/core/kernel-save';
 import { SimulationEngine } from '../../../src/simulation/core/simulation-engine';
 import type { SimulationSystem } from '../../../src/simulation/core/simulation-system';
@@ -35,6 +38,24 @@ function createEngine() {
     handlers: [noopHandler],
   });
 }
+
+type RuntimeCodecWorld = Readonly<{
+  name: string;
+  bytes: Uint8Array;
+}>;
+
+type SavedCodecWorld = Readonly<{
+  name: string;
+  bytes: readonly number[];
+}>;
+
+const runtimeWorldCodec: WorldSaveCodec<RuntimeCodecWorld, SavedCodecWorld> = {
+  encode: (world) => ({ name: world.name, bytes: Array.from(world.bytes) }),
+  decode: (savedWorld) => ({
+    name: savedWorld.name,
+    bytes: Uint8Array.from(savedWorld.bytes),
+  }),
+};
 
 describe('kernel save and restore', () => {
   it('preserves authoritative state and explicit save version', () => {
@@ -80,6 +101,31 @@ describe('kernel save and restore', () => {
 
     const save = createKernelSave(engine, '2026-09-24T00:00:00.000Z');
     expect(JSON.stringify(save)).not.toContain('runtime-only-command-id');
+  });
+
+  it('encodes and restores a runtime world through an explicit world codec', () => {
+    const engine = SimulationEngine.create<RuntimeCodecWorld>({
+      world: {
+        name: 'codec-world',
+        bytes: Uint8Array.from([0, 1, 2, 127, 255]),
+      },
+      seed: 'codec-save-seed',
+    });
+    engine.step(3);
+
+    const save = createKernelSaveWithCodec(engine, '2026-09-24T00:00:00.000Z', runtimeWorldCodec);
+    const restored = restoreKernelStateWithCodec(save, runtimeWorldCodec);
+
+    expect(save.state.world).toEqual({
+      name: 'codec-world',
+      bytes: [0, 1, 2, 127, 255],
+    });
+    expect(save.state.world).not.toBe(engine.state.world);
+    expect(restored.revision).toBe(engine.state.revision);
+    expect(restored.clock).toEqual(engine.state.clock);
+    expect(restored.randomState).toEqual(engine.state.randomState);
+    expect(restored.world.name).toBe('codec-world');
+    expect(Array.from(restored.world.bytes)).toEqual([0, 1, 2, 127, 255]);
   });
 
   it('rejects an unsupported save version', () => {
