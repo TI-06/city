@@ -32,14 +32,11 @@ describe('starter world map generator', () => {
   it.each([
     [15, 128],
     [128, 15],
-  ])(
-    'rejects starter dimensions below the generator minimum (%s, %s)',
-    (width, height) => {
-      expect(() =>
-        createStarterWorldMap('too-small', createGridDimensions(width, height)),
-      ).toThrow(/at least 16/i);
-    },
-  );
+  ])('rejects starter dimensions below the generator minimum (%s, %s)', (width, height) => {
+    expect(() => createStarterWorldMap('too-small', createGridDimensions(width, height))).toThrow(
+      /at least 16/i,
+    );
+  });
 
   it('produces byte-identical terrain for the same seed', () => {
     expect(terrainBytes('city-a')).toEqual(terrainBytes('city-a'));
