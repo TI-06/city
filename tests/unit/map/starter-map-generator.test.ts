@@ -7,7 +7,11 @@ import {
 } from '../../../src/simulation/map/starter-map-generator';
 import { TerrainCode } from '../../../src/simulation/map/world-map-state';
 
-function terrainBytes(seed: string, width = DEFAULT_STARTER_MAP_SIZE, height = DEFAULT_STARTER_MAP_SIZE) {
+function terrainBytes(
+  seed: string,
+  width = DEFAULT_STARTER_MAP_SIZE,
+  height = DEFAULT_STARTER_MAP_SIZE,
+) {
   return createStarterWorldMap(seed, createGridDimensions(width, height))
     .terrain.copyChunks()
     .map((chunk) => Array.from(chunk));
@@ -28,11 +32,14 @@ describe('starter world map generator', () => {
   it.each([
     [15, 128],
     [128, 15],
-  ])('rejects starter dimensions below the generator minimum (%s, %s)', (width, height) => {
-    expect(() =>
-      createStarterWorldMap('too-small', createGridDimensions(width, height)),
-    ).toThrow(/at least 16/i);
-  });
+  ])(
+    'rejects starter dimensions below the generator minimum (%s, %s)',
+    (width, height) => {
+      expect(() =>
+        createStarterWorldMap('too-small', createGridDimensions(width, height)),
+      ).toThrow(/at least 16/i);
+    },
+  );
 
   it('produces byte-identical terrain for the same seed', () => {
     expect(terrainBytes('city-a')).toEqual(terrainBytes('city-a'));
