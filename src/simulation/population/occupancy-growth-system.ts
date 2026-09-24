@@ -7,9 +7,7 @@ export const COMMERCIAL_LEVEL_1_JOB_CAPACITY = 8;
 export const INDUSTRIAL_LEVEL_1_JOB_CAPACITY = 12;
 
 function companyJobCapacity(kind: CompanyKind): number {
-  return kind === 'commercial'
-    ? COMMERCIAL_LEVEL_1_JOB_CAPACITY
-    : INDUSTRIAL_LEVEL_1_JOB_CAPACITY;
+  return kind === 'commercial' ? COMMERCIAL_LEVEL_1_JOB_CAPACITY : INDUSTRIAL_LEVEL_1_JOB_CAPACITY;
 }
 
 function collectResidentialCandidates(world: CityWorldState): number[] {
