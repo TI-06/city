@@ -41,8 +41,6 @@ describe('world map codec', () => {
       generatorVersion: WORLD_MAP_GENERATOR_VERSION + 1,
     } as unknown as EncodedWorldMapState;
 
-    expect(() => decodeWorldMapState(invalid)).toThrow(
-      /unsupported world map generator version/i,
-    );
+    expect(() => decodeWorldMapState(invalid)).toThrow(/unsupported world map generator version/i);
   });
 });
