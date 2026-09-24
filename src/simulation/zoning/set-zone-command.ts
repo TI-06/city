@@ -1,12 +1,7 @@
 import type { CommandHandler } from '../core/command-handler';
 import { TerrainCode } from '../map/world-map-state';
 import type { CityWorldState } from '../world/city-world-state';
-import {
-  ZoneCode,
-  isZoneCode,
-  type ZoneCodeValue,
-  type ZoningState,
-} from './zoning-state';
+import { ZoneCode, isZoneCode, type ZoneCodeValue, type ZoningState } from './zoning-state';
 
 export const MAX_ZONE_CELLS_PER_COMMAND = 256;
 
@@ -129,10 +124,7 @@ function validateAndFindChanges(
       cell.x >= world.map.dimensions.width ||
       cell.y >= world.map.dimensions.height
     ) {
-      throw new ZoningValidationError(
-        'OUT_OF_BOUNDS',
-        `Zone cell ${index} is outside map bounds`,
-      );
+      throw new ZoningValidationError('OUT_OF_BOUNDS', `Zone cell ${index} is outside map bounds`);
     }
 
     const key = coordinateKey(cell.x, cell.y);
@@ -147,10 +139,7 @@ function validateAndFindChanges(
       }
 
       if (roadCoordinates?.has(key) === true) {
-        throw new ZoningValidationError(
-          'ROAD_CONFLICT',
-          `Zone cell ${key} cannot overlap a road`,
-        );
+        throw new ZoningValidationError('ROAD_CONFLICT', `Zone cell ${key} cannot overlap a road`);
       }
     }
 
