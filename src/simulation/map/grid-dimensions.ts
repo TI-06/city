@@ -13,7 +13,10 @@ function assertAxis(value: number, label: string): void {
   }
 }
 
-export function createGridDimensions(width: number, height: number): GridDimensions {
+export function createGridDimensions(
+  width: number,
+  height: number,
+): GridDimensions {
   assertAxis(width, 'width');
   assertAxis(height, 'height');
 
