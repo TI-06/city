@@ -26,9 +26,7 @@ export function encodeZoningState(state: ZoningState): EncodedZoningState {
 
 export function decodeZoningState(saved: EncodedZoningState): ZoningState {
   if (saved.codecVersion !== ZONING_CODEC_VERSION) {
-    throw new RangeError(
-      `Unsupported zoning codec version: ${saved.codecVersion}; expected ${ZONING_CODEC_VERSION}`,
-    );
+    throw new RangeError('Unsupported zoning codec version; expected 1');
   }
 
   return createZoningState(saved.version, decodeChunkedByteGrid(saved.grid));
