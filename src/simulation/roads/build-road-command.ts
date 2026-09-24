@@ -1,5 +1,6 @@
 import type { CommandHandler } from '../core/command-handler';
-import { createCityWorldState, type CityWorldState } from '../world/city-world-state';
+import type { CityWorldState } from '../world/city-world-state';
+import { ZoneCode, getZoneAt } from '../zoning/zoning-state';
 import { applyRoadBuild } from './apply-road-build';
 import { planRoadBuild, type RoadGridPoint } from './road-build-plan';
 
@@ -52,10 +53,19 @@ export const buildRoadPathHandler: CommandHandler<CityWorldState> = {
   apply: (world, payload) => {
     const parsed = parseBuildRoadPathPayload(payload);
     const plan = planRoadBuild(world.map, world.roads, parsed.cells);
+    for (const node of plan.nodesToAdd) {
+      if (getZoneAt(world.zoning, node.x, node.y) !== ZoneCode.NONE) {
+        throw new RangeError(`Road cell ${node.x},${node.y} cannot overlap a zone`);
+      }
+    }
+
     const roads = applyRoadBuild(world.roads, plan);
 
     return {
-      world: createCityWorldState(world.map, roads, world.zoning),
+      world: {
+        ...world,
+        roads,
+      },
       delta: {
         topologyVersion: roads.topologyVersion,
         addedNodeIds: plan.nodesToAdd.map((node) => node.id),
