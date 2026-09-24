@@ -119,13 +119,19 @@ describe('city world codec', () => {
     const map = createStarterWorldMap('zoning-dimensions');
     const zoning = createEmptyZoning(createGridDimensions(16, 16));
 
-    expect(() => createCityWorldState(map, createRoadNetworkState({
-      topologyVersion: 0,
-      nextNodeId: 1,
-      nextEdgeId: 1,
-      nodes: [],
-      edges: [],
-    }), zoning)).toThrow(/zoning dimensions.*map/i);
+    expect(() =>
+      createCityWorldState(
+        map,
+        createRoadNetworkState({
+          topologyVersion: 0,
+          nextNodeId: 1,
+          nextEdgeId: 1,
+          nodes: [],
+          edges: [],
+        }),
+        zoning,
+      ),
+    ).toThrow(/zoning dimensions.*map/i);
   });
 
   it('rejects non-empty zoning placed on water', () => {
@@ -160,11 +166,7 @@ describe('city world codec', () => {
     const roads = createRoadFixture();
     const zoning = createZoningState(
       1,
-      ChunkedByteGrid.filled(map.dimensions, ZoneCode.NONE).withCell(
-        0,
-        0,
-        ZoneCode.COMMERCIAL,
-      ),
+      ChunkedByteGrid.filled(map.dimensions, ZoneCode.NONE).withCell(0, 0, ZoneCode.COMMERCIAL),
     );
 
     expect(() => createCityWorldState(map, roads, zoning)).toThrow(/zone.*road/i);
