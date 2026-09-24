@@ -28,9 +28,7 @@ function dimensionsFromTerrain(terrain: WorldMapState['terrain']): GridDimension
   return terrain.dimensions;
 }
 
-export function encodeWorldMapState(
-  world: WorldMapState,
-): EncodedWorldMapState {
+export function encodeWorldMapState(world: WorldMapState): EncodedWorldMapState {
   assertSupportedGeneratorVersion(world.generatorVersion);
 
   return {
@@ -40,9 +38,7 @@ export function encodeWorldMapState(
   };
 }
 
-export function decodeWorldMapState(
-  savedWorld: EncodedWorldMapState,
-): WorldMapState {
+export function decodeWorldMapState(savedWorld: EncodedWorldMapState): WorldMapState {
   assertSupportedGeneratorVersion(savedWorld.generatorVersion);
   const terrain = decodeChunkedByteGrid(savedWorld.terrain);
 
@@ -54,10 +50,7 @@ export function decodeWorldMapState(
   };
 }
 
-export const worldMapSaveCodec: WorldSaveCodec<
-  WorldMapState,
-  EncodedWorldMapState
-> = {
+export const worldMapSaveCodec: WorldSaveCodec<WorldMapState, EncodedWorldMapState> = {
   encode: encodeWorldMapState,
   decode: decodeWorldMapState,
 };
