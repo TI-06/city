@@ -26,6 +26,7 @@
 - Same map seed + same dimensions + same generator version must produce byte-identical terrain.
 - Different representative seeds must produce different river paths.
 - Starter map default is 128×128.
+- Starter-map generation requires width and height >= 16; generic grids still allow 1–512.
 - Terrain v1 contains only `LAND = 1` and `WATER = 0`.
 - Starter and max-size map snapshots must remain comfortably inside the existing 2 MiB starter save budget.
 - 10,000 current-state grid edits must not cause serialized snapshot size to grow with edit history.
@@ -412,6 +413,7 @@ git commit -m "feat: add compact byte grid persistence codec"
   - `TerrainCode.LAND = 1`
   - `WORLD_MAP_GENERATOR_VERSION = 1`
   - `DEFAULT_STARTER_MAP_SIZE = 128`
+  - `MIN_STARTER_MAP_AXIS_CELLS = 16`
   - `WorldMapState`
   - `createStarterWorldMap(seed, dimensions?)`
   - `EncodedWorldMapState`
@@ -432,6 +434,7 @@ export type WorldMapState = Readonly<{
 
 Verify:
 - default dimensions are 128×128,
+- width or height below 16 throws a clear RangeError,
 - same seed yields identical terrain chunks,
 - representative seeds `'city-a'` and `'city-b'` produce different terrain,
 - only WATER/LAND codes exist,
@@ -443,11 +446,12 @@ Verify:
 
 Generate a narrow deterministic river, not noise:
 
-1. initialize `riverX` from the center 40% of the map using `SeededRandom.fromSeed(`map-v1:${seed}`)`,
-2. every 6 rows choose drift `-1`, `0`, or `1`,
-3. clamp the river center to `2 .. width - 3`,
-4. river width is 2 cells,
-5. force the outermost 2-cell border to LAND so later road/tutorial placement always has buildable edges.
+1. validate both dimensions are >= `MIN_STARTER_MAP_AXIS_CELLS`,
+2. initialize `riverX` from the center 40% of the map using `SeededRandom.fromSeed(`map-v1:${seed}`)`,
+3. every 6 rows choose drift `-1`, `0`, or `1`,
+4. clamp the river center to `2 .. width - 3`,
+5. river width is 2 cells,
+6. force the outermost 2-cell border to LAND so later road/tutorial placement always has buildable edges.
 
 Precompute one river-center x value per row, then call `ChunkedByteGrid.generate()` once; do not call `withCell()` thousands of times during generation.
 
