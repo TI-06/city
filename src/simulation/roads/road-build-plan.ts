@@ -1,10 +1,6 @@
 import type { WorldMapState } from '../map/world-map-state';
 import { TerrainCode } from '../map/world-map-state';
-import type {
-  RoadEdge,
-  RoadNetworkState,
-  RoadNode,
-} from './road-network-state';
+import type { RoadEdge, RoadNetworkState, RoadNode } from './road-network-state';
 
 export const ROAD_TWO_LANE_CELL_COST = 100;
 export const MAX_ROAD_PATH_CELLS = 256;
@@ -61,10 +57,7 @@ function edgePairKey(nodeA: number, nodeB: number): string {
 
 function validateRoadPath(map: WorldMapState, cells: readonly RoadGridPoint[]): void {
   if (cells.length < 2) {
-    throw new RoadBuildValidationError(
-      'PATH_TOO_SHORT',
-      'Road path must contain at least 2 cells',
-    );
+    throw new RoadBuildValidationError('PATH_TOO_SHORT', 'Road path must contain at least 2 cells');
   }
 
   if (cells.length > MAX_ROAD_PATH_CELLS) {
@@ -100,18 +93,12 @@ function validateRoadPath(map: WorldMapState, cells: readonly RoadGridPoint[]): 
 
     const key = coordinateKey(cell.x, cell.y);
     if (seen.has(key)) {
-      throw new RoadBuildValidationError(
-        'REPEATED_CELL',
-        `Road path repeats cell ${key}`,
-      );
+      throw new RoadBuildValidationError('REPEATED_CELL', `Road path repeats cell ${key}`);
     }
     seen.add(key);
 
     if (map.terrain.get(cell.x, cell.y) !== TerrainCode.LAND) {
-      throw new RoadBuildValidationError(
-        'WATER',
-        `Road path cell ${key} is not LAND`,
-      );
+      throw new RoadBuildValidationError('WATER', `Road path cell ${key} is not LAND`);
     }
   }
 
@@ -170,9 +157,7 @@ export function planRoadBuild(
 
   for (const node of nodesToAdd) {
     for (const [offsetX, offsetY] of NEIGHBOR_OFFSETS) {
-      const neighbor = nodeByCoordinate.get(
-        coordinateKey(node.x + offsetX, node.y + offsetY),
-      );
+      const neighbor = nodeByCoordinate.get(coordinateKey(node.x + offsetX, node.y + offsetY));
       if (neighbor === undefined) {
         continue;
       }
