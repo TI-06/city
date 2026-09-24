@@ -12,25 +12,37 @@ import {
   WORLD_MAP_GENERATOR_VERSION,
   type WorldMapState,
 } from '../../../src/simulation/map/world-map-state';
-import { createBuildingState, createEmptyBuildingState } from '../../../src/simulation/buildings/building-state';
+import {
+  createBuildingState,
+  createEmptyBuildingState,
+} from '../../../src/simulation/buildings/building-state';
 import {
   createAutomaticDevelopmentSystem,
   DEVELOPMENT_ATTEMPTS_PER_HOUR,
 } from '../../../src/simulation/development/automatic-development-system';
 import { createDevelopmentDemandState } from '../../../src/simulation/development/development-demand-state';
 import { createRoadNetworkState } from '../../../src/simulation/roads/road-network-state';
-import { createCityWorldState, type CityWorldState } from '../../../src/simulation/world/city-world-state';
-import { ZoneCode, createZoningState, type ZoneCodeValue } from '../../../src/simulation/zoning/zoning-state';
+import {
+  createCityWorldState,
+  type CityWorldState,
+} from '../../../src/simulation/world/city-world-state';
+import {
+  ZoneCode,
+  createZoningState,
+  type ZoneCodeValue,
+} from '../../../src/simulation/zoning/zoning-state';
 
 const SAVED_AT_ISO = '2026-09-25T00:00:00.000Z';
 
-function createLinearDevelopmentWorld(options: Readonly<{
-  zone?: ZoneCodeValue;
-  demand?: number;
-  candidateCount?: number;
-  withRoad?: boolean;
-  occupiedFirstCell?: boolean;
-}> = {}): CityWorldState {
+function createLinearDevelopmentWorld(
+  options: Readonly<{
+    zone?: ZoneCodeValue;
+    demand?: number;
+    candidateCount?: number;
+    withRoad?: boolean;
+    occupiedFirstCell?: boolean;
+  }> = {},
+): CityWorldState {
   const zone = options.zone ?? ZoneCode.RESIDENTIAL;
   const demandValue = options.demand ?? 100;
   const candidateCount = options.candidateCount ?? 1;
