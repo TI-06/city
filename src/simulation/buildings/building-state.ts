@@ -105,10 +105,6 @@ export function createBuildingState(input: BuildingStateInput): BuildingState {
   };
 }
 
-export function findBuildingAt(
-  state: BuildingState,
-  x: number,
-  y: number,
-): Building | undefined {
+export function findBuildingAt(state: BuildingState, x: number, y: number): Building | undefined {
   return state.buildings.find((building) => building.x === x && building.y === y);
 }
