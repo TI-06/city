@@ -40,9 +40,7 @@ function createWorld(): CityWorldState {
       { id: 1, x: 0, y: 0 },
       { id: 2, x: 1, y: 0 },
     ],
-    edges: [
-      { id: 1, nodeA: 1, nodeB: 2, roadType: 'two-lane', laneCount: 2, lengthCells: 1 },
-    ],
+    edges: [{ id: 1, nodeA: 1, nodeB: 2, roadType: 'two-lane', laneCount: 2, lengthCells: 1 }],
   });
   const services = createPublicServiceState({
     version: 1,
