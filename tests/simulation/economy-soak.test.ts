@@ -7,7 +7,10 @@ import {
 } from '../../src/simulation/core/kernel-save';
 import { SimulationEngine } from '../../src/simulation/core/simulation-engine';
 import { SIMULATION_HOURS_PER_YEAR } from '../../src/simulation/core/simulation-clock';
-import { createBuildingState, type BuildingUse } from '../../src/simulation/buildings/building-state';
+import {
+  createBuildingState,
+  type BuildingUse,
+} from '../../src/simulation/buildings/building-state';
 import { createCompanyState } from '../../src/simulation/economy/company-state';
 import { createDailyEconomySystem } from '../../src/simulation/economy/daily-economy-system';
 import { deriveDailyEconomyFlow } from '../../src/simulation/economy/daily-economy-flow';
@@ -103,15 +106,7 @@ function createDevelopedEconomyWorld(buildingCount: number, roadNodeCount: numbe
     }),
   });
 
-  return createCityWorldState(
-    map,
-    roads,
-    undefined,
-    buildings,
-    undefined,
-    households,
-    companies,
-  );
+  return createCityWorldState(map, roads, undefined, buildings, undefined, households, companies);
 }
 
 function createEconomyEngine(world: CityWorldState, seed = 'economy-soak') {
