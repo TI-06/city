@@ -11,11 +11,7 @@ import {
   encodeDevelopmentDemandState,
   type EncodedDevelopmentDemandState,
 } from './development-demand-codec';
-import {
-  decodeEconomyState,
-  encodeEconomyState,
-  type EncodedEconomyState,
-} from './economy-codec';
+import { decodeEconomyState, encodeEconomyState, type EncodedEconomyState } from './economy-codec';
 import {
   decodeHouseholdState,
   encodeHouseholdState,
