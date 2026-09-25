@@ -29,6 +29,11 @@ import {
 } from '../population/household-state';
 import { createEmptyRoadNetwork, type RoadNetworkState } from '../roads/road-network-state';
 import {
+  createEmptyPublicServiceState,
+  createPublicServiceState,
+  type PublicServiceState,
+} from '../services/public-service-state';
+import {
   createEmptyTrafficState,
   createTrafficState,
   type TrafficState,
@@ -45,6 +50,7 @@ export type CityWorldState = Readonly<{
   companies: CompanyState;
   economy: EconomyState;
   traffic: TrafficState;
+  publicServices: PublicServiceState;
 }>;
 
 function coordinateKey(x: number, y: number): string {
@@ -61,6 +67,7 @@ export function createCityWorldState(
   companies: CompanyState = createEmptyCompanyState(),
   economy: EconomyState = createDefaultEconomyState(),
   traffic: TrafficState = createEmptyTrafficState(roads.topologyVersion),
+  publicServices: PublicServiceState = createEmptyPublicServiceState(),
 ): CityWorldState {
   const zoningDimensions = zoning.grid.dimensions;
   if (
@@ -149,6 +156,42 @@ export function createCityWorldState(
     }
   }
 
+  const validatedPublicServices = createPublicServiceState(publicServices);
+  const buildingCoordinates = new Set(
+    validatedBuildings.buildings.map((building) => coordinateKey(building.x, building.y)),
+  );
+
+  for (const service of validatedPublicServices.services) {
+    assertGridCoordinate(map.dimensions, service.x, service.y);
+
+    if (map.terrain.get(service.x, service.y) !== TerrainCode.LAND) {
+      throw new RangeError(`Public service ${service.id} must be placed on LAND terrain`);
+    }
+
+    const key = coordinateKey(service.x, service.y);
+    if (roadCoordinates.has(key)) {
+      throw new RangeError(`Public service ${service.id} cannot overlap a road cell`);
+    }
+
+    if (getZoneAt(zoning, service.x, service.y) !== ZoneCode.NONE) {
+      throw new RangeError(`Public service ${service.id} cannot overlap a zone`);
+    }
+
+    if (buildingCoordinates.has(key)) {
+      throw new RangeError(`Public service ${service.id} cannot overlap a building`);
+    }
+
+    const hasRoadAccess =
+      roadCoordinates.has(coordinateKey(service.x, service.y - 1)) ||
+      roadCoordinates.has(coordinateKey(service.x - 1, service.y)) ||
+      roadCoordinates.has(coordinateKey(service.x + 1, service.y)) ||
+      roadCoordinates.has(coordinateKey(service.x, service.y + 1));
+
+    if (!hasRoadAccess) {
+      throw new RangeError(`Public service ${service.id} must have adjacent road access`);
+    }
+  }
+
   const validatedTraffic = createTrafficState(traffic);
   if (validatedTraffic.roadTopologyVersion !== roads.topologyVersion) {
     throw new RangeError(
@@ -173,6 +216,7 @@ export function createCityWorldState(
     companies: validatedCompanies,
     economy: createEconomyState(economy),
     traffic: validatedTraffic,
+    publicServices: validatedPublicServices,
   };
 }
 
