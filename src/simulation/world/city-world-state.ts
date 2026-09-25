@@ -28,6 +28,11 @@ import {
   type HouseholdState,
 } from '../population/household-state';
 import { createEmptyRoadNetwork, type RoadNetworkState } from '../roads/road-network-state';
+import {
+  createEmptyTrafficState,
+  createTrafficState,
+  type TrafficState,
+} from '../traffic/traffic-state';
 import { ZoneCode, createEmptyZoning, getZoneAt, type ZoningState } from '../zoning/zoning-state';
 
 export type CityWorldState = Readonly<{
@@ -39,6 +44,7 @@ export type CityWorldState = Readonly<{
   households: HouseholdState;
   companies: CompanyState;
   economy: EconomyState;
+  traffic: TrafficState;
 }>;
 
 function coordinateKey(x: number, y: number): string {
@@ -54,6 +60,7 @@ export function createCityWorldState(
   households: HouseholdState = createEmptyHouseholdState(),
   companies: CompanyState = createEmptyCompanyState(),
   economy: EconomyState = createDefaultEconomyState(),
+  traffic: TrafficState = createEmptyTrafficState(roads.topologyVersion),
 ): CityWorldState {
   const zoningDimensions = zoning.grid.dimensions;
   if (
@@ -142,6 +149,20 @@ export function createCityWorldState(
     }
   }
 
+  const validatedTraffic = createTrafficState(traffic);
+  if (validatedTraffic.roadTopologyVersion !== roads.topologyVersion) {
+    throw new RangeError(
+      `Traffic road topology version ${validatedTraffic.roadTopologyVersion} must match road topology version ${roads.topologyVersion}`,
+    );
+  }
+
+  const roadEdgeIds = new Set(roads.edges.map((edge) => edge.id));
+  for (const entry of validatedTraffic.edgeVolumes) {
+    if (!roadEdgeIds.has(entry.edgeId)) {
+      throw new RangeError(`Traffic edge ${entry.edgeId} must reference an existing road edge`);
+    }
+  }
+
   return {
     map,
     roads,
@@ -151,6 +172,7 @@ export function createCityWorldState(
     households: validatedHouseholds,
     companies: validatedCompanies,
     economy: createEconomyState(economy),
+    traffic: validatedTraffic,
   };
 }
 

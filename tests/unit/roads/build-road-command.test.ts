@@ -13,6 +13,7 @@ import {
   type BuildRoadPathPayload,
 } from '../../../src/simulation/roads/build-road-command';
 import { RoadBuildValidationError } from '../../../src/simulation/roads/road-build-plan';
+import { createTrafficState } from '../../../src/simulation/traffic/traffic-state';
 import {
   createCityWorldState,
   createStarterCityWorld,
@@ -243,6 +244,7 @@ describe('BUILD_ROAD_PATH command', () => {
     engine.dispatch(buildCommand('road-first', 0, cells));
     const roadsAfterFirst = engine.state.world.roads;
     const economyAfterFirst = engine.state.world.economy;
+    const trafficAfterFirst = engine.state.world.traffic;
 
     const response = engine.dispatch(
       buildCommand('road-existing', 1, cells),
@@ -265,6 +267,49 @@ describe('BUILD_ROAD_PATH command', () => {
     expect(engine.state.world.roads.nextEdgeId).toBe(2);
     expect(engine.state.world.economy).toBe(economyAfterFirst);
     expect(engine.state.world.economy.treasury).toBe(999_800);
+    expect(engine.state.world.traffic).toBe(trafficAfterFirst);
+  });
+
+  it('clears stale traffic immediately when road topology changes', () => {
+    const first = createEngine();
+    first.dispatch(
+      buildCommand('traffic-seed-road', 0, [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+      ]),
+    );
+    const seeded = first.state.world;
+    const traffic = createTrafficState({
+      version: 5,
+      roadTopologyVersion: seeded.roads.topologyVersion,
+      edgeVolumes: [{ edgeId: 1, volume: 150 }],
+    });
+    const world = createCityWorldState(
+      seeded.map,
+      seeded.roads,
+      seeded.zoning,
+      seeded.buildings,
+      seeded.developmentDemand,
+      seeded.households,
+      seeded.companies,
+      seeded.economy,
+      traffic,
+    );
+    const engine = createEngine(world);
+
+    engine.dispatch(
+      buildCommand('traffic-road-extension', 0, [
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+      ]),
+    );
+
+    expect(engine.state.world.roads.topologyVersion).toBe(2);
+    expect(engine.state.world.traffic).toEqual({
+      version: 6,
+      roadTopologyVersion: 2,
+      edgeVolumes: [],
+    });
   });
 
   it('keeps the maximum 256-cell command response below the ordinary response budget', () => {
