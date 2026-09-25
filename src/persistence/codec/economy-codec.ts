@@ -1,7 +1,4 @@
-import {
-  createEconomyState,
-  type EconomyState,
-} from '../../simulation/economy/economy-state';
+import { createEconomyState, type EconomyState } from '../../simulation/economy/economy-state';
 
 export const ECONOMY_CODEC_VERSION = 1;
 
