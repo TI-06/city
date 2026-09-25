@@ -4,6 +4,7 @@ import { ORDINARY_RESPONSE_TARGET_BYTES } from '../../../src/shared/transport/co
 import type { GameCommand, MutationResponse } from '../../../src/shared/transport/game-command';
 import { createBuildingState } from '../../../src/simulation/buildings/building-state';
 import { SimulationEngine } from '../../../src/simulation/core/simulation-engine';
+import { createEconomyState } from '../../../src/simulation/economy/economy-state';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
 import { TerrainCode } from '../../../src/simulation/map/world-map-state';
 import {
@@ -66,6 +67,10 @@ describe('BUILD_ROAD_PATH command', () => {
     expect(engine.state.world.map).toBe(originalMap);
     expect(engine.state.world.roads.nodes).toHaveLength(2);
     expect(engine.state.world.roads.edges).toHaveLength(1);
+    expect(engine.state.world.economy).toEqual({
+      version: 1,
+      treasury: 999_800,
+    });
     expect(engine.state.revision).toBe(1);
   });
 
@@ -84,6 +89,10 @@ describe('BUILD_ROAD_PATH command', () => {
     expect(engine.state.world.roads.topologyVersion).toBe(1);
     expect(engine.state.world.roads.nodes).toHaveLength(2);
     expect(engine.state.world.roads.edges).toHaveLength(1);
+    expect(engine.state.world.economy).toEqual({
+      version: 1,
+      treasury: 999_800,
+    });
   });
 
   it('returns a revision conflict without mutating roads', () => {
@@ -192,6 +201,38 @@ describe('BUILD_ROAD_PATH command', () => {
     expect(engine.recentCommandCount).toBe(0);
   });
 
+  it('rejects construction when treasury cannot cover the planned road cost', () => {
+    const base = createStarterCityWorld('road-insufficient-funds');
+    const economy = createEconomyState({
+      version: 0,
+      treasury: 199,
+    });
+    const world = createCityWorldState(
+      base.map,
+      base.roads,
+      base.zoning,
+      base.buildings,
+      base.developmentDemand,
+      base.households,
+      base.companies,
+      economy,
+    );
+    const engine = createEngine(world);
+    const before = engine.state;
+
+    expect(() =>
+      engine.dispatch(
+        buildCommand('road-insufficient-funds', 0, [
+          { x: 0, y: 0 },
+          { x: 1, y: 0 },
+        ]),
+      ),
+    ).toThrow(/insufficient.*fund/i);
+
+    expect(engine.state).toEqual(before);
+    expect(engine.recentCommandCount).toBe(0);
+  });
+
   it('treats an all-existing path as a road-topology no-op while revision advances', () => {
     const engine = createEngine();
     const cells = [
@@ -201,6 +242,7 @@ describe('BUILD_ROAD_PATH command', () => {
 
     engine.dispatch(buildCommand('road-first', 0, cells));
     const roadsAfterFirst = engine.state.world.roads;
+    const economyAfterFirst = engine.state.world.economy;
 
     const response = engine.dispatch(
       buildCommand('road-existing', 1, cells),
@@ -221,6 +263,8 @@ describe('BUILD_ROAD_PATH command', () => {
     expect(engine.state.world.roads.topologyVersion).toBe(1);
     expect(engine.state.world.roads.nextNodeId).toBe(3);
     expect(engine.state.world.roads.nextEdgeId).toBe(2);
+    expect(engine.state.world.economy).toBe(economyAfterFirst);
+    expect(engine.state.world.economy.treasury).toBe(999_800);
   });
 
   it('keeps the maximum 256-cell command response below the ordinary response budget', () => {
