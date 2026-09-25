@@ -7,7 +7,10 @@ import {
 } from '../../src/simulation/core/kernel-save';
 import { SIMULATION_HOURS_PER_YEAR } from '../../src/simulation/core/simulation-clock';
 import { SimulationEngine } from '../../src/simulation/core/simulation-engine';
-import { createBuildingState, type BuildingUse } from '../../src/simulation/buildings/building-state';
+import {
+  createBuildingState,
+  type BuildingUse,
+} from '../../src/simulation/buildings/building-state';
 import { createCompanyState } from '../../src/simulation/economy/company-state';
 import { ChunkedByteGrid } from '../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../src/simulation/map/grid-dimensions';
@@ -17,7 +20,10 @@ import {
   type WorldMapState,
 } from '../../src/simulation/map/world-map-state';
 import { createHouseholdState } from '../../src/simulation/population/household-state';
-import { createRoadNetworkState, type RoadEdge } from '../../src/simulation/roads/road-network-state';
+import {
+  createRoadNetworkState,
+  type RoadEdge,
+} from '../../src/simulation/roads/road-network-state';
 import { deriveTrafficEdgeMetrics } from '../../src/simulation/traffic/traffic-metrics';
 import { createTrafficPressureSystem } from '../../src/simulation/traffic/traffic-pressure-system';
 import {
@@ -168,21 +174,10 @@ function createConnectedDevelopedWorld(totalBuildings = LARGE_BUILDING_COUNT): C
     })),
   });
 
-  return createCityWorldState(
-    map,
-    roads,
-    undefined,
-    buildings,
-    undefined,
-    households,
-    companies,
-  );
+  return createCityWorldState(map, roads, undefined, buildings, undefined, households, companies);
 }
 
-function createTrafficEngine(
-  world: CityWorldState,
-  seed = 'traffic-soak-engine',
-) {
+function createTrafficEngine(world: CityWorldState, seed = 'traffic-soak-engine') {
   const system = createTrafficPressureSystem();
   const engine = SimulationEngine.create<CityWorldState>({
     world,
