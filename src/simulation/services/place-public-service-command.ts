@@ -78,9 +78,7 @@ function validatePlacement(world: CityWorldState, payload: PlacePublicServicePay
   }
 
   const key = coordinateKey(payload.x, payload.y);
-  const roadCoordinates = new Set(
-    world.roads.nodes.map((node) => coordinateKey(node.x, node.y)),
-  );
+  const roadCoordinates = new Set(world.roads.nodes.map((node) => coordinateKey(node.x, node.y)));
 
   if (roadCoordinates.has(key)) {
     throw new RangeError('Public service cannot overlap a road');
