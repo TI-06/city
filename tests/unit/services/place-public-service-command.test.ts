@@ -13,9 +13,7 @@ import {
   type WorldMapState,
 } from '../../../src/simulation/map/world-map-state';
 import { createRoadNetworkState } from '../../../src/simulation/roads/road-network-state';
-import {
-  getPublicServicePlacementCost,
-} from '../../../src/simulation/services/public-service-catalog';
+import { getPublicServicePlacementCost } from '../../../src/simulation/services/public-service-catalog';
 import {
   placePublicServiceHandler,
   type PlacePublicServiceDelta,
@@ -26,10 +24,7 @@ import {
   createCityWorldState,
   type CityWorldState,
 } from '../../../src/simulation/world/city-world-state';
-import {
-  ZoneCode,
-  createZoningState,
-} from '../../../src/simulation/zoning/zoning-state';
+import { ZoneCode, createZoningState } from '../../../src/simulation/zoning/zoning-state';
 
 function createLandMap(): WorldMapState {
   const dimensions = createGridDimensions(16, 16);
@@ -208,10 +203,7 @@ describe('PLACE_PUBLIC_SERVICE command', () => {
       ),
     ).toThrow(/land/i);
 
-    const zoning = createZoningState(
-      1,
-      base.zoning.grid.withCell(0, 1, ZoneCode.RESIDENTIAL),
-    );
+    const zoning = createZoningState(1, base.zoning.grid.withCell(0, 1, ZoneCode.RESIDENTIAL));
     expect(() =>
       createEngine(createCityWorldState(base.map, base.roads, zoning)).dispatch(
         serviceCommand('service-zone', 0, { kind: 'school', x: 0, y: 1 }),
@@ -219,9 +211,7 @@ describe('PLACE_PUBLIC_SERVICE command', () => {
     ).toThrow(/zone/i);
 
     expect(() =>
-      createEngine().dispatch(
-        serviceCommand('service-road', 0, { kind: 'fire', x: 0, y: 0 }),
-      ),
+      createEngine().dispatch(serviceCommand('service-road', 0, { kind: 'fire', x: 0, y: 0 })),
     ).toThrow(/road/i);
 
     const buildings = createBuildingState({
@@ -230,9 +220,7 @@ describe('PLACE_PUBLIC_SERVICE command', () => {
       buildings: [{ id: 1, x: 0, y: 1, use: 'residential', level: 1 }],
     });
     expect(() =>
-      createEngine(
-        createCityWorldState(base.map, base.roads, undefined, buildings),
-      ).dispatch(
+      createEngine(createCityWorldState(base.map, base.roads, undefined, buildings)).dispatch(
         serviceCommand('service-building', 0, { kind: 'police', x: 0, y: 1 }),
       ),
     ).toThrow(/building/i);
@@ -256,9 +244,7 @@ describe('PLACE_PUBLIC_SERVICE command', () => {
           base.traffic,
           existingServices,
         ),
-      ).dispatch(
-        serviceCommand('service-existing', 0, { kind: 'hospital', x: 0, y: 1 }),
-      ),
+      ).dispatch(serviceCommand('service-existing', 0, { kind: 'hospital', x: 0, y: 1 })),
     ).toThrow(/service/i);
 
     expect(() =>
