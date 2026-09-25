@@ -1,3 +1,4 @@
+import { getPublicServiceDailyOperatingCost } from '../services/public-service-catalog';
 import type { CityWorldState } from '../world/city-world-state';
 import { derivePopulationJobsStatistics } from '../population/population-jobs-statistics';
 
@@ -48,11 +49,21 @@ export function deriveDailyEconomyFlow(world: CityWorldState): DailyEconomyFlow 
     'Employment tax revenue',
   );
   const taxRevenue = safeAdd(residentTax, employmentTax, 'Daily tax revenue');
-  const operatingCost = safeMultiply(
+  const roadOperatingCost = safeMultiply(
     world.roads.nodes.length,
     ROAD_NODE_MAINTENANCE_PER_DAY,
-    'Daily operating cost',
+    'Daily road operating cost',
   );
+  const serviceOperatingCost = world.publicServices.services.reduce(
+    (total, service) =>
+      safeAdd(
+        total,
+        getPublicServiceDailyOperatingCost(service.kind),
+        'Daily public service operating cost',
+      ),
+    0,
+  );
+  const operatingCost = safeAdd(roadOperatingCost, serviceOperatingCost, 'Daily operating cost');
   const net = safeSubtract(taxRevenue, operatingCost, 'Daily economy net');
 
   return {

@@ -71,6 +71,14 @@ export const buildRoadPathHandler: CommandHandler<CityWorldState> = {
       }
     }
 
+    for (const service of world.publicServices.services) {
+      if (plannedCoordinates.has(`${service.x},${service.y}`)) {
+        throw new RangeError(
+          `Road cell ${service.x},${service.y} cannot overlap public service ${service.id}`,
+        );
+      }
+    }
+
     const economy = spendTreasury(world.economy, plan.constructionCost);
     const roads = applyRoadBuild(world.roads, plan);
     const traffic = resetTrafficForRoadTopology(world.traffic, roads.topologyVersion);
