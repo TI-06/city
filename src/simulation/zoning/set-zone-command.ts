@@ -110,9 +110,7 @@ function validateAndFindChanges(
     payload.zone === ZoneCode.NONE
       ? undefined
       : new Set(
-          world.publicServices.services.map((service) =>
-            coordinateKey(service.x, service.y),
-          ),
+          world.publicServices.services.map((service) => coordinateKey(service.x, service.y)),
         );
   const seen = new Set<string>();
   const changed: ZoneGridPoint[] = [];
