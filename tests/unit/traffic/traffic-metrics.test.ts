@@ -41,9 +41,7 @@ describe('traffic metrics', () => {
   });
 
   it('caps displayed congestion percent', () => {
-    expect(deriveTrafficEdgeMetrics(EDGE, 5_000).congestionPercent).toBe(
-      MAX_CONGESTION_PERCENT,
-    );
+    expect(deriveTrafficEdgeMetrics(EDGE, 5_000).congestionPercent).toBe(MAX_CONGESTION_PERCENT);
   });
 
   it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(

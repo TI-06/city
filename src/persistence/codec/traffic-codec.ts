@@ -14,7 +14,9 @@ export type EncodedTrafficState = Readonly<{
 
 function decodeEdgeVolume(tuple: unknown, index: number): TrafficEdgeVolume {
   if (!Array.isArray(tuple) || tuple.length !== 2) {
-    throw new RangeError(`Traffic edge volume tuple at index ${index} must contain exactly 2 values`);
+    throw new RangeError(
+      `Traffic edge volume tuple at index ${index} must contain exactly 2 values`,
+    );
   }
 
   const values = tuple as readonly unknown[];

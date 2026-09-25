@@ -59,8 +59,14 @@ describe('traffic state', () => {
   it.each([
     [{ edgeId: 0, volume: 1 }],
     [{ edgeId: 1, volume: 0 }],
-    [{ edgeId: 2, volume: 1 }, { edgeId: 1, volume: 1 }],
-    [{ edgeId: 1, volume: 1 }, { edgeId: 1, volume: 2 }],
+    [
+      { edgeId: 2, volume: 1 },
+      { edgeId: 1, volume: 1 },
+    ],
+    [
+      { edgeId: 1, volume: 1 },
+      { edgeId: 1, volume: 2 },
+    ],
   ])('rejects invalid or unsorted edge volumes %#', (edgeVolumes) => {
     expect(() =>
       createTrafficState({
