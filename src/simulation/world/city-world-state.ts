@@ -14,6 +14,11 @@ import {
   createEmptyCompanyState,
   type CompanyState,
 } from '../economy/company-state';
+import {
+  createDefaultEconomyState,
+  createEconomyState,
+  type EconomyState,
+} from '../economy/economy-state';
 import { assertGridCoordinate, type GridDimensions } from '../map/grid-dimensions';
 import { createStarterWorldMap } from '../map/starter-map-generator';
 import { TerrainCode, type WorldMapState } from '../map/world-map-state';
@@ -33,6 +38,7 @@ export type CityWorldState = Readonly<{
   developmentDemand: DevelopmentDemandState;
   households: HouseholdState;
   companies: CompanyState;
+  economy: EconomyState;
 }>;
 
 function coordinateKey(x: number, y: number): string {
@@ -47,6 +53,7 @@ export function createCityWorldState(
   developmentDemand: DevelopmentDemandState = createDefaultDevelopmentDemand(),
   households: HouseholdState = createEmptyHouseholdState(),
   companies: CompanyState = createEmptyCompanyState(),
+  economy: EconomyState = createDefaultEconomyState(),
 ): CityWorldState {
   const zoningDimensions = zoning.grid.dimensions;
   if (
@@ -143,6 +150,7 @@ export function createCityWorldState(
     developmentDemand: createDevelopmentDemandState(developmentDemand),
     households: validatedHouseholds,
     companies: validatedCompanies,
+    economy: createEconomyState(economy),
   };
 }
 

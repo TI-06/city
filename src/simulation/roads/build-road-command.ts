@@ -1,4 +1,5 @@
 import type { CommandHandler } from '../core/command-handler';
+import { spendTreasury } from '../economy/economy-state';
 import type { CityWorldState } from '../world/city-world-state';
 import { ZoneCode, getZoneAt } from '../zoning/zoning-state';
 import { applyRoadBuild } from './apply-road-build';
@@ -69,12 +70,14 @@ export const buildRoadPathHandler: CommandHandler<CityWorldState> = {
       }
     }
 
+    const economy = spendTreasury(world.economy, plan.constructionCost);
     const roads = applyRoadBuild(world.roads, plan);
 
     return {
       world: {
         ...world,
         roads,
+        economy,
       },
       delta: {
         topologyVersion: roads.topologyVersion,
