@@ -54,9 +54,7 @@ function decodeKind(value: unknown): PublicServiceKind {
 
 function decodeServiceTuple(tuple: unknown, index: number): PublicService {
   if (!Array.isArray(tuple) || tuple.length !== 4) {
-    throw new RangeError(
-      `Public service tuple at index ${index} must contain exactly 4 values`,
-    );
+    throw new RangeError(`Public service tuple at index ${index} must contain exactly 4 values`);
   }
 
   const values = tuple as readonly unknown[];
@@ -66,9 +64,7 @@ function decodeServiceTuple(tuple: unknown, index: number): PublicService {
   const kindCode = values[3];
 
   if (typeof id !== 'number' || typeof x !== 'number' || typeof y !== 'number') {
-    throw new RangeError(
-      `Public service tuple at index ${index} requires numeric id, x, and y`,
-    );
+    throw new RangeError(`Public service tuple at index ${index} requires numeric id, x, and y`);
   }
 
   return {
@@ -79,9 +75,7 @@ function decodeServiceTuple(tuple: unknown, index: number): PublicService {
   };
 }
 
-export function encodePublicServiceState(
-  state: PublicServiceState,
-): EncodedPublicServiceState {
+export function encodePublicServiceState(state: PublicServiceState): EncodedPublicServiceState {
   const validated = createPublicServiceState(state);
 
   return {
@@ -93,9 +87,7 @@ export function encodePublicServiceState(
   };
 }
 
-export function decodePublicServiceState(
-  saved: EncodedPublicServiceState,
-): PublicServiceState {
+export function decodePublicServiceState(saved: EncodedPublicServiceState): PublicServiceState {
   if (saved.codecVersion !== PUBLIC_SERVICE_CODEC_VERSION) {
     throw new RangeError('Unsupported public service codec version; expected 1');
   }
