@@ -20,6 +20,7 @@ import { createStarterWorldMap } from '../../../src/simulation/map/starter-map-g
 import { TerrainCode, type WorldMapState } from '../../../src/simulation/map/world-map-state';
 import { createHouseholdState } from '../../../src/simulation/population/household-state';
 import { createRoadNetworkState } from '../../../src/simulation/roads/road-network-state';
+import { createTrafficState } from '../../../src/simulation/traffic/traffic-state';
 import {
   createCityWorldState,
   createStarterCityWorld,
@@ -117,6 +118,11 @@ describe('city world codec', () => {
     expect(city.economy).toEqual({
       version: 0,
       treasury: INITIAL_TREASURY,
+    });
+    expect(city.traffic).toEqual({
+      version: 0,
+      roadTopologyVersion: 0,
+      edgeVolumes: [],
     });
     expect(city.map.mapSeed).toBe('city-world-seed');
   });
@@ -463,7 +469,87 @@ describe('city world codec', () => {
     ).toThrow(/company.*kind|building use/i);
   });
 
-  it('round-trips compact household, company, and economy state through CityWorld v4', () => {
+  it('rejects traffic targeting a stale road topology version', () => {
+    const map = createStarterWorldMap('traffic-topology-mismatch');
+    const roads = createRoadFixture();
+    const traffic = createTrafficState({
+      version: 1,
+      roadTopologyVersion: 0,
+      edgeVolumes: [],
+    });
+
+    expect(() =>
+      createCityWorldState(
+        map,
+        roads,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        traffic,
+      ),
+    ).toThrow(/traffic.*topology/i);
+  });
+
+  it('rejects traffic that references a missing road edge', () => {
+    const map = createStarterWorldMap('traffic-missing-edge');
+    const roads = createRoadFixture();
+    const traffic = createTrafficState({
+      version: 1,
+      roadTopologyVersion: roads.topologyVersion,
+      edgeVolumes: [{ edgeId: 999, volume: 10 }],
+    });
+
+    expect(() =>
+      createCityWorldState(
+        map,
+        roads,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        traffic,
+      ),
+    ).toThrow(/traffic edge.*existing road edge/i);
+  });
+
+  it('round-trips compact traffic through CityWorld v5', () => {
+    const map = createStarterWorldMap('traffic-round-trip');
+    const roads = createRoadFixture();
+    const traffic = createTrafficState({
+      version: 2,
+      roadTopologyVersion: roads.topologyVersion,
+      edgeVolumes: [{ edgeId: 1, volume: 125 }],
+    });
+    const city = createCityWorldState(
+      map,
+      roads,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      traffic,
+    );
+
+    const encoded = encodeCityWorldState(city);
+    const restored = decodeCityWorldState(encoded);
+
+    expect(encoded.codecVersion).toBe(CITY_WORLD_CODEC_VERSION);
+    expect(encoded.traffic).toEqual({
+      codecVersion: 1,
+      meta: [2, 1],
+      edgeVolumes: [[1, 125]],
+    });
+    expect(restored.traffic).toEqual(traffic);
+  });
+
+  it('round-trips compact household, company, and economy state through CityWorld v5', () => {
     const map = createStarterWorldMap('population-round-trip');
     const buildings = createBuildingState({
       version: 2,
@@ -630,6 +716,14 @@ describe('city world codec', () => {
     expect(encoded.buildings.buildings).toEqual([]);
     expect(encoded.developmentDemand.values).toEqual([0, 60, 60, 60]);
     expect(encoded.economy.values).toEqual([0, INITIAL_TREASURY]);
+    expect(encoded.traffic).toEqual({
+      codecVersion: 1,
+      meta: [0, 1],
+      edgeVolumes: [],
+    });
+    expect(serialized).not.toContain('routeCache');
+    expect(serialized).not.toContain('nodeByCoordinate');
+    expect(serialized).not.toContain('vehicle');
     expect(serialized).not.toContain('dailyHistory');
     expect(serialized).not.toContain('transactions');
     expect(encoded.roads.nodes).toEqual([
