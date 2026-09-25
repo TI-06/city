@@ -23,13 +23,18 @@ import {
   type EncodedRoadNetworkState,
 } from './road-network-codec';
 import {
+  decodeTrafficState,
+  encodeTrafficState,
+  type EncodedTrafficState,
+} from './traffic-codec';
+import {
   decodeWorldMapState,
   encodeWorldMapState,
   type EncodedWorldMapState,
 } from './world-map-codec';
 import { decodeZoningState, encodeZoningState, type EncodedZoningState } from './zoning-codec';
 
-export const CITY_WORLD_CODEC_VERSION = 4;
+export const CITY_WORLD_CODEC_VERSION = 5;
 
 export type EncodedCityWorldState = Readonly<{
   codecVersion: typeof CITY_WORLD_CODEC_VERSION;
@@ -41,6 +46,7 @@ export type EncodedCityWorldState = Readonly<{
   households: EncodedHouseholdState;
   companies: EncodedCompanyState;
   economy: EncodedEconomyState;
+  traffic: EncodedTrafficState;
 }>;
 
 export function encodeCityWorldState(world: CityWorldState): EncodedCityWorldState {
@@ -53,6 +59,7 @@ export function encodeCityWorldState(world: CityWorldState): EncodedCityWorldSta
     world.households,
     world.companies,
     world.economy,
+    world.traffic,
   );
 
   return {
@@ -65,12 +72,13 @@ export function encodeCityWorldState(world: CityWorldState): EncodedCityWorldSta
     households: encodeHouseholdState(validated.households),
     companies: encodeCompanyState(validated.companies),
     economy: encodeEconomyState(validated.economy),
+    traffic: encodeTrafficState(validated.traffic),
   };
 }
 
 export function decodeCityWorldState(saved: EncodedCityWorldState): CityWorldState {
   if (saved.codecVersion !== CITY_WORLD_CODEC_VERSION) {
-    throw new RangeError('Unsupported city world codec version; expected 4');
+    throw new RangeError('Unsupported city world codec version; expected 5');
   }
 
   return createCityWorldState(
@@ -82,6 +90,7 @@ export function decodeCityWorldState(saved: EncodedCityWorldState): CityWorldSta
     decodeHouseholdState(saved.households),
     decodeCompanyState(saved.companies),
     decodeEconomyState(saved.economy),
+    decodeTrafficState(saved.traffic),
   );
 }
 
