@@ -63,11 +63,7 @@ export function deriveDailyEconomyFlow(world: CityWorldState): DailyEconomyFlow 
       ),
     0,
   );
-  const operatingCost = safeAdd(
-    roadOperatingCost,
-    serviceOperatingCost,
-    'Daily operating cost',
-  );
+  const operatingCost = safeAdd(roadOperatingCost, serviceOperatingCost, 'Daily operating cost');
   const net = safeSubtract(taxRevenue, operatingCost, 'Daily economy net');
 
   return {
