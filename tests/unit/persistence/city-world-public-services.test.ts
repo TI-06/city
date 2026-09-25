@@ -18,10 +18,7 @@ import {
   createCityWorldState,
   createStarterCityWorld,
 } from '../../../src/simulation/world/city-world-state';
-import {
-  ZoneCode,
-  createZoningState,
-} from '../../../src/simulation/zoning/zoning-state';
+import { ZoneCode, createZoningState } from '../../../src/simulation/zoning/zoning-state';
 
 function createLandMap(): WorldMapState {
   const dimensions = createGridDimensions(16, 16);
@@ -142,11 +139,7 @@ describe('CityWorld public services', () => {
 
     const zoning = createZoningState(
       1,
-      ChunkedByteGrid.filled(map.dimensions, ZoneCode.NONE).withCell(
-        0,
-        1,
-        ZoneCode.RESIDENTIAL,
-      ),
+      ChunkedByteGrid.filled(map.dimensions, ZoneCode.NONE).withCell(0, 1, ZoneCode.RESIDENTIAL),
     );
     expect(() =>
       createCityWorldState(
