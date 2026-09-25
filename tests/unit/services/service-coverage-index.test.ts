@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRoadNetworkState } from '../../../src/simulation/roads/road-network-state';
-import {
-  createServiceCoverageIndex,
-} from '../../../src/simulation/services/service-coverage-index';
+import { createServiceCoverageIndex } from '../../../src/simulation/services/service-coverage-index';
 import { createPublicServiceState } from '../../../src/simulation/services/public-service-state';
 
 function createLinearRoads(length = 40) {
