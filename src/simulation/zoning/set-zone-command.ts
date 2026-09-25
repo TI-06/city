@@ -28,7 +28,8 @@ export type ZoningValidationCode =
   | 'OUT_OF_BOUNDS'
   | 'REPEATED_CELL'
   | 'WATER'
-  | 'ROAD_CONFLICT';
+  | 'ROAD_CONFLICT'
+  | 'SERVICE_CONFLICT';
 
 export class ZoningValidationError extends RangeError {
   public constructor(
@@ -105,6 +106,14 @@ function validateAndFindChanges(
     payload.zone === ZoneCode.NONE
       ? undefined
       : new Set(world.roads.nodes.map((node) => coordinateKey(node.x, node.y)));
+  const serviceCoordinates =
+    payload.zone === ZoneCode.NONE
+      ? undefined
+      : new Set(
+          world.publicServices.services.map((service) =>
+            coordinateKey(service.x, service.y),
+          ),
+        );
   const seen = new Set<string>();
   const changed: ZoneGridPoint[] = [];
 
@@ -140,6 +149,13 @@ function validateAndFindChanges(
 
       if (roadCoordinates?.has(key) === true) {
         throw new ZoningValidationError('ROAD_CONFLICT', `Zone cell ${key} cannot overlap a road`);
+      }
+
+      if (serviceCoordinates?.has(key) === true) {
+        throw new ZoningValidationError(
+          'SERVICE_CONFLICT',
+          `Zone cell ${key} cannot overlap a public service`,
+        );
       }
     }
 
