@@ -10,6 +10,10 @@ import { worldMapSaveCodec } from '../../../src/persistence/codec/world-map-code
 import { createBuildingState } from '../../../src/simulation/buildings/building-state';
 import { createDevelopmentDemandState } from '../../../src/simulation/development/development-demand-state';
 import { createCompanyState } from '../../../src/simulation/economy/company-state';
+import {
+  INITIAL_TREASURY,
+  createEconomyState,
+} from '../../../src/simulation/economy/economy-state';
 import { ChunkedByteGrid } from '../../../src/simulation/map/chunked-byte-grid';
 import { createGridDimensions } from '../../../src/simulation/map/grid-dimensions';
 import { createStarterWorldMap } from '../../../src/simulation/map/starter-map-generator';
@@ -109,6 +113,10 @@ describe('city world codec', () => {
       version: 0,
       nextCompanyId: 1,
       companies: [],
+    });
+    expect(city.economy).toEqual({
+      version: 0,
+      treasury: INITIAL_TREASURY,
     });
     expect(city.map.mapSeed).toBe('city-world-seed');
   });
@@ -455,7 +463,7 @@ describe('city world codec', () => {
     ).toThrow(/company.*kind|building use/i);
   });
 
-  it('round-trips compact household and company references through CityWorld v3', () => {
+  it('round-trips compact household, company, and economy state through CityWorld v4', () => {
     const map = createStarterWorldMap('population-round-trip');
     const buildings = createBuildingState({
       version: 2,
@@ -475,6 +483,10 @@ describe('city world codec', () => {
       nextCompanyId: 2,
       companies: [{ id: 1, buildingId: 2, kind: 'industrial', jobCapacity: 12 }],
     });
+    const economy = createEconomyState({
+      version: 3,
+      treasury: -250,
+    });
     const city = createCityWorldState(
       map,
       createRoadFixture(),
@@ -483,6 +495,7 @@ describe('city world codec', () => {
       undefined,
       households,
       companies,
+      economy,
     );
 
     const encoded = encodeCityWorldState(city);
@@ -491,8 +504,10 @@ describe('city world codec', () => {
     expect(encoded.codecVersion).toBe(CITY_WORLD_CODEC_VERSION);
     expect(encoded.households.households).toEqual([[1, 1, 4, 2]]);
     expect(encoded.companies.companies).toEqual([[1, 2, 2, 12]]);
+    expect(encoded.economy.values).toEqual([3, -250]);
     expect(restored.households).toEqual(households);
     expect(restored.companies).toEqual(companies);
+    expect(restored.economy).toEqual(economy);
     expect(JSON.stringify(encoded.households)).not.toContain('"x"');
     expect(JSON.stringify(encoded.companies)).not.toContain('"use"');
   });
@@ -614,6 +629,9 @@ describe('city world codec', () => {
     expect(encoded.zoning.grid.chunks.every((chunk) => typeof chunk === 'string')).toBe(true);
     expect(encoded.buildings.buildings).toEqual([]);
     expect(encoded.developmentDemand.values).toEqual([0, 60, 60, 60]);
+    expect(encoded.economy.values).toEqual([0, INITIAL_TREASURY]);
+    expect(serialized).not.toContain('dailyHistory');
+    expect(serialized).not.toContain('transactions');
     expect(encoded.roads.nodes).toEqual([
       [1, 0, 0],
       [2, 1, 0],
