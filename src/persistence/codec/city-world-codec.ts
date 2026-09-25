@@ -22,11 +22,7 @@ import {
   encodeRoadNetworkState,
   type EncodedRoadNetworkState,
 } from './road-network-codec';
-import {
-  decodeTrafficState,
-  encodeTrafficState,
-  type EncodedTrafficState,
-} from './traffic-codec';
+import { decodeTrafficState, encodeTrafficState, type EncodedTrafficState } from './traffic-codec';
 import {
   decodeWorldMapState,
   encodeWorldMapState,
