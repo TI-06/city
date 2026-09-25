@@ -31,7 +31,7 @@ function assertPositiveSafeInteger(value: number, label: string): void {
   }
 }
 
-function isPublicServiceKind(value: string): value is PublicServiceKind {
+export function isPublicServiceKind(value: string): value is PublicServiceKind {
   return (
     value === 'park' ||
     value === 'school' ||
