@@ -2,14 +2,8 @@ import type { Building } from '../buildings/building-state';
 import type { SimulationSystem } from '../core/simulation-system';
 import { derivePopulationJobsStatistics } from '../population/population-jobs-statistics';
 import type { CityWorldState } from '../world/city-world-state';
-import {
-  createRoadRoutingIndex,
-  type RoadRoutingIndex,
-} from './road-routing-index';
-import {
-  replaceTrafficVolumes,
-  type TrafficEdgeVolume,
-} from './traffic-state';
+import { createRoadRoutingIndex, type RoadRoutingIndex } from './road-routing-index';
+import { replaceTrafficVolumes, type TrafficEdgeVolume } from './traffic-state';
 
 export const MAX_TRAFFIC_COHORTS = 64;
 
@@ -102,11 +96,7 @@ function replaceWorldTraffic(
   world: CityWorldState,
   edgeVolumes: readonly TrafficEdgeVolume[],
 ): CityWorldState {
-  const traffic = replaceTrafficVolumes(
-    world.traffic,
-    world.roads.topologyVersion,
-    edgeVolumes,
-  );
+  const traffic = replaceTrafficVolumes(world.traffic, world.roads.topologyVersion, edgeVolumes);
 
   if (traffic === world.traffic) {
     return world;
@@ -148,10 +138,7 @@ export function createTrafficPressureSystem(): TrafficPressureSystem {
       lastRouteSearchCount = 0;
       lastCohortWeight = 0;
 
-      const statistics = derivePopulationJobsStatistics(
-        world.households,
-        world.companies,
-      );
+      const statistics = derivePopulationJobsStatistics(world.households, world.companies);
 
       if (statistics.employed === 0) {
         lastSourceSnapshot = sourceSnapshot;
@@ -174,22 +161,14 @@ export function createTrafficPressureSystem(): TrafficPressureSystem {
       }
 
       const origins = collectHouseholdOrigins(world, buildingById, routingIndex);
-      const destinations = collectCompanyDestinations(
-        world,
-        buildingById,
-        routingIndex,
-      );
+      const destinations = collectCompanyDestinations(world, buildingById, routingIndex);
 
       if (origins.length === 0 || destinations.length === 0) {
         lastSourceSnapshot = sourceSnapshot;
         return replaceWorldTraffic(world, []);
       }
 
-      const cohortCount = Math.min(
-        MAX_TRAFFIC_COHORTS,
-        statistics.employed,
-        origins.length,
-      );
+      const cohortCount = Math.min(MAX_TRAFFIC_COHORTS, statistics.employed, origins.length);
 
       if (cohortCount <= 0) {
         lastSourceSnapshot = sourceSnapshot;
@@ -206,27 +185,17 @@ export function createTrafficPressureSystem(): TrafficPressureSystem {
         const destination = destinations[index % destinations.length]!;
         const weight = baseWeight + (index < remainder ? 1 : 0);
 
-        lastCohortWeight = safeAdd(
-          lastCohortWeight,
-          weight,
-          'Traffic cohort weight total',
-        );
+        lastCohortWeight = safeAdd(lastCohortWeight, weight, 'Traffic cohort weight total');
         lastRouteSearchCount += 1;
 
-        const edgeIds = routingIndex.findShortestPathEdgeIds(
-          origin.nodeId,
-          destination.nodeId,
-        );
+        const edgeIds = routingIndex.findShortestPathEdgeIds(origin.nodeId, destination.nodeId);
         if (edgeIds === undefined) {
           continue;
         }
 
         for (const edgeId of edgeIds) {
           const current = volumeByEdgeId.get(edgeId) ?? 0;
-          volumeByEdgeId.set(
-            edgeId,
-            safeAdd(current, weight, `Traffic edge ${edgeId} volume`),
-          );
+          volumeByEdgeId.set(edgeId, safeAdd(current, weight, `Traffic edge ${edgeId} volume`));
         }
       }
 
