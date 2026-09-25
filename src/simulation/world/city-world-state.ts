@@ -159,9 +159,7 @@ export function createCityWorldState(
   const roadEdgeIds = new Set(roads.edges.map((edge) => edge.id));
   for (const entry of validatedTraffic.edgeVolumes) {
     if (!roadEdgeIds.has(entry.edgeId)) {
-      throw new RangeError(
-        `Traffic edge ${entry.edgeId} must reference an existing road edge`,
-      );
+      throw new RangeError(`Traffic edge ${entry.edgeId} must reference an existing road edge`);
     }
   }
 
