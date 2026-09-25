@@ -81,15 +81,7 @@ function createConnectedCommuteWorld(workerCount = 2, jobCapacity = 8): CityWorl
     companies: [{ id: 1, buildingId: 2, kind: 'commercial', jobCapacity }],
   });
 
-  return createCityWorldState(
-    map,
-    roads,
-    undefined,
-    buildings,
-    undefined,
-    households,
-    companies,
-  );
+  return createCityWorldState(map, roads, undefined, buildings, undefined, households, companies);
 }
 
 function createNoEmploymentWorld(): CityWorldState {
@@ -147,15 +139,7 @@ function createDisconnectedWorld(): CityWorldState {
     companies: [{ id: 1, buildingId: 2, kind: 'industrial', jobCapacity: 12 }],
   });
 
-  return createCityWorldState(
-    map,
-    roads,
-    undefined,
-    buildings,
-    undefined,
-    households,
-    companies,
-  );
+  return createCityWorldState(map, roads, undefined, buildings, undefined, households, companies);
 }
 
 function createLargeEmploymentWorld(): CityWorldState {
@@ -227,15 +211,7 @@ function createLargeEmploymentWorld(): CityWorldState {
     ],
   });
 
-  return createCityWorldState(
-    map,
-    roads,
-    undefined,
-    buildings,
-    undefined,
-    households,
-    companies,
-  );
+  return createCityWorldState(map, roads, undefined, buildings, undefined, households, companies);
 }
 
 function createEngine(world: CityWorldState, system = createTrafficPressureSystem()) {
