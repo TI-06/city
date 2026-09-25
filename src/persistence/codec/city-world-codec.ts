@@ -12,6 +12,11 @@ import {
   type EncodedDevelopmentDemandState,
 } from './development-demand-codec';
 import {
+  decodeEconomyState,
+  encodeEconomyState,
+  type EncodedEconomyState,
+} from './economy-codec';
+import {
   decodeHouseholdState,
   encodeHouseholdState,
   type EncodedHouseholdState,
@@ -28,7 +33,7 @@ import {
 } from './world-map-codec';
 import { decodeZoningState, encodeZoningState, type EncodedZoningState } from './zoning-codec';
 
-export const CITY_WORLD_CODEC_VERSION = 3;
+export const CITY_WORLD_CODEC_VERSION = 4;
 
 export type EncodedCityWorldState = Readonly<{
   codecVersion: typeof CITY_WORLD_CODEC_VERSION;
@@ -39,6 +44,7 @@ export type EncodedCityWorldState = Readonly<{
   developmentDemand: EncodedDevelopmentDemandState;
   households: EncodedHouseholdState;
   companies: EncodedCompanyState;
+  economy: EncodedEconomyState;
 }>;
 
 export function encodeCityWorldState(world: CityWorldState): EncodedCityWorldState {
@@ -50,6 +56,7 @@ export function encodeCityWorldState(world: CityWorldState): EncodedCityWorldSta
     world.developmentDemand,
     world.households,
     world.companies,
+    world.economy,
   );
 
   return {
@@ -61,12 +68,13 @@ export function encodeCityWorldState(world: CityWorldState): EncodedCityWorldSta
     developmentDemand: encodeDevelopmentDemandState(validated.developmentDemand),
     households: encodeHouseholdState(validated.households),
     companies: encodeCompanyState(validated.companies),
+    economy: encodeEconomyState(validated.economy),
   };
 }
 
 export function decodeCityWorldState(saved: EncodedCityWorldState): CityWorldState {
   if (saved.codecVersion !== CITY_WORLD_CODEC_VERSION) {
-    throw new RangeError('Unsupported city world codec version; expected 3');
+    throw new RangeError('Unsupported city world codec version; expected 4');
   }
 
   return createCityWorldState(
@@ -77,6 +85,7 @@ export function decodeCityWorldState(saved: EncodedCityWorldState): CityWorldSta
     decodeDevelopmentDemandState(saved.developmentDemand),
     decodeHouseholdState(saved.households),
     decodeCompanyState(saved.companies),
+    decodeEconomyState(saved.economy),
   );
 }
 
