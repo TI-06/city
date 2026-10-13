@@ -1,5 +1,8 @@
-node_modules/
-.wrangler/
-.dev.vars*
-.DS_Store
-coverage/
+node_modules
+dist
+.vite
+.wrangler
+coverage
+*.tsbuildinfo
+.env*
+!.env.example
