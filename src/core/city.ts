@@ -100,6 +100,65 @@ export function applyTool(current: City,tool:Tool,x:number,y:number):CommandResu
   if(tool==='park'||tool==='school'||tool==='clinic')city.services.push({id:city.nextId++,x,y,kind:tool});
   return {ok:true,changed:true,message:`${toolNames[tool]}を設置しました`,city};
 }
+/**
+ * Apply a drag gesture with one city clone and one state update. Individual
+ * invalid tiles are skipped; the entire action is one undoable transaction.
+ * The input city is never mutated, including in insufficient-funds cases.
+ */
+export function applyStroke(current: City, tool: Tool, points: readonly Readonly<{x:number;y:number}>[]): CommandResult {
+  if (points.length === 0 || points.length > 256) {
+    return {ok:false,changed:false,message:'一度に操作できる区画は1〜256マスです',city:current};
+  }
+  if (tool === 'inspect') {
+    const p=points[points.length-1]!;
+    return applyTool(current,tool,p.x,p.y);
+  }
+  const next=structuredClone(current);
+  const visited=new Set<string>();
+  let applied=0, skipped=0, lastReason='配置できません';
+  for (const {x,y} of points) {
+    if (!inside(x,y)) {skipped++;lastReason='マップの範囲外です';continue;}
+    const key=`${x},${y}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    const i=idx(x,y);
+    const exists=Boolean(next.roads[i]||next.zones[i]||buildingAt(next,x,y)||serviceAt(next,x,y));
+    if (tool==='bulldoze') {
+      if (!exists) {skipped++;lastReason='撤去するものがありません';continue;}
+      if (next.funds<COST.bulldoze) {skipped++;lastReason='撤去資金が足りません';continue;}
+      next.funds-=COST.bulldoze;
+      next.roads[i]=0;next.zones[i]=0;
+      next.buildings=next.buildings.filter(b=>b.x!==x||b.y!==y);
+      next.services=next.services.filter(s=>s.x!==x||s.y!==y);
+      applied++;
+      continue;
+    }
+    if (!landAt(next,x,y)) {skipped++;lastReason='水域には建設できません';continue;}
+    if (exists) {skipped++;lastReason='すでに建物・地区・道路があります';continue;}
+    if (tool!=='road'&&!adjacent(next,x,y)) {skipped++;lastReason='道路に接する土地を選択してください';continue;}
+    if (next.funds<COST[tool]) {skipped++;lastReason='資金が足りません';continue;}
+    next.funds-=COST[tool];
+    if (tool==='road') next.roads[i]=1;
+    else if (tool==='home'||tool==='shop'||tool==='industry') next.zones[i]=tool==='home'?1:tool==='shop'?2:3;
+    else if (tool==='park'||tool==='school'||tool==='clinic') next.services.push({id:next.nextId++,x,y,kind:tool});
+    applied++;
+  }
+  if (applied===0) return {ok:false,changed:false,message:lastReason,city:current};
+  const status=skipped?`（配置できない${skipped}マスはスキップ）`:'';
+  return {ok:true,changed:true,message:`${toolNames[tool]}：${applied}マスを${tool==='bulldoze'?'撤去':'配置'}しました${status}`,city:next};
+}
+
+/** Non-mutating indication used for tile hover highlights. */
+export function canPlaceAt(city:City,tool:Tool,x:number,y:number):boolean {
+  if(!inside(x,y))return false;
+  if(tool==='inspect')return true;
+  const i=idx(x,y);
+  const occupied=Boolean(city.roads[i]||city.zones[i]||buildingAt(city,x,y)||serviceAt(city,x,y));
+  if(tool==='bulldoze')return occupied&&city.funds>=COST.bulldoze;
+  if(!landAt(city,x,y)||occupied||city.funds<COST[tool])return false;
+  return tool==='road'||adjacent(city,x,y);
+}
+
 export function describeTile(city:City,x:number,y:number):string{
   if(!inside(x,y))return '';
   if(city.land[idx(x,y)]===0)return '川・水域';
