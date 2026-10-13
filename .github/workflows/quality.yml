@@ -1,15 +1,17 @@
-name: Quality
+name: Verify cityscape
 on:
   push:
-    branches: [main]
+    branches: [main, 'rebuild/**']
   pull_request:
-  workflow_dispatch:
+    branches: [main]
 jobs:
-  validate:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm run check
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npm run verify
