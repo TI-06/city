@@ -43,7 +43,7 @@ test('detailed statistics stay under one data destination with fast return to th
   const canvas=page.locator('.map-host canvas');
   await expect(canvas).toBeVisible({timeout:30_000});
   const nav=page.getByRole('navigation',{name:'メインメニュー'});
-  const original=await canvas.elementHandle();
+  await canvas.evaluate(el=>{(el as HTMLCanvasElement).dataset.tabStable='true';});
   await nav.getByRole('button',{name:'都市データ'}).click();
   const tabs=page.getByRole('tablist',{name:'都市データの表示切替'});
   await expect(tabs.getByRole('tab')).toHaveCount(4);
@@ -58,5 +58,5 @@ test('detailed statistics stay under one data destination with fast return to th
   await tabs.getByRole('button',{name:'地図に戻る'}).click();
   await expect(nav.getByRole('button',{name:'街を運営'})).toHaveAttribute('aria-current','page');
   await expect(canvas).toBeVisible();
-  expect(await canvas.elementHandle()).toEqual(original);
+  await expect(canvas).toHaveAttribute('data-tab-stable','true');
 });
