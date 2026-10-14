@@ -6,7 +6,7 @@ test('city play is one persistent map for construction, tax, policy and investme
  const map=page.locator('.map-host canvas');
  await expect(map).toBeVisible({timeout:30_000});
  await expect(page.getByRole('button',{name:'街を運営'})).toBeVisible();
- await expect(page.getByRole('button',{name:'都市データ'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'都市データ',exact:true})).toBeVisible();
  const manager=page.getByRole('button',{name:'都市運営メニューを開く'});
  await manager.click();
  await expect(page.getByRole('group',{name:'都市運営コマンド'})).toBeVisible();
@@ -33,7 +33,7 @@ test('data subtabs do not multiply the primary app navigation',async ({page})=>{
  await page.goto('/');
  const primary=page.getByRole('navigation',{name:'メインメニュー'});
  await expect(primary.getByRole('button')).toHaveCount(2);
- await primary.getByRole('button',{name:'都市データ'}).click();
+ await primary.getByRole('button',{name:'都市データ',exact:true}).click();
  const sub=page.getByRole('navigation',{name:'都市データの切替'});
  await expect(sub.getByRole('button')).toHaveCount(4);
  await sub.getByRole('button',{name:'住民と人口'}).click();
