@@ -34,10 +34,10 @@ function neighbors(index: number, roads: readonly number[]): number[] {
   const x = index % SIZE;
   const y = Math.floor(index / SIZE);
   const next: number[] = [];
-  if (y > 0 && roads[index - SIZE] > 0) next.push(index - SIZE);
-  if (x > 0 && roads[index - 1] > 0) next.push(index - 1);
-  if (x < SIZE - 1 && roads[index + 1] > 0) next.push(index + 1);
-  if (y < SIZE - 1 && roads[index + SIZE] > 0) next.push(index + SIZE);
+  if (y > 0 && (roads[index - SIZE] ?? 0) > 0) next.push(index - SIZE);
+  if (x > 0 && (roads[index - 1] ?? 0) > 0) next.push(index - 1);
+  if (x < SIZE - 1 && (roads[index + 1] ?? 0) > 0) next.push(index + 1);
+  if (y < SIZE - 1 && (roads[index + SIZE] ?? 0) > 0) next.push(index + SIZE);
   return next;
 }
 
@@ -63,10 +63,10 @@ function getNetwork(roads: number[]): Network {
 /** Select a building's lowest-index orthogonally adjacent road tile. */
 export function buildingRoadAccess(roads: readonly number[], x: number, y: number): number | undefined {
   const adjacent: number[] = [];
-  if (y > 0 && roads[(y - 1) * SIZE + x] > 0) adjacent.push((y - 1) * SIZE + x);
-  if (x > 0 && roads[y * SIZE + x - 1] > 0) adjacent.push(y * SIZE + x - 1);
-  if (x < SIZE - 1 && roads[y * SIZE + x + 1] > 0) adjacent.push(y * SIZE + x + 1);
-  if (y < SIZE - 1 && roads[(y + 1) * SIZE + x] > 0) adjacent.push((y + 1) * SIZE + x);
+  if (y > 0 && (roads[(y - 1) * SIZE + x] ?? 0) > 0) adjacent.push((y - 1) * SIZE + x);
+  if (x > 0 && (roads[y * SIZE + x - 1] ?? 0) > 0) adjacent.push(y * SIZE + x - 1);
+  if (x < SIZE - 1 && (roads[y * SIZE + x + 1] ?? 0) > 0) adjacent.push(y * SIZE + x + 1);
+  if (y < SIZE - 1 && (roads[(y + 1) * SIZE + x] ?? 0) > 0) adjacent.push((y + 1) * SIZE + x);
   return adjacent.length ? Math.min(...adjacent) : undefined;
 }
 
