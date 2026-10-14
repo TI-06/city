@@ -85,7 +85,16 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
     const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i);
     if(city.zones[i]){
       diamond(g,p.x,p.y,COVERAGE[city.zones[i]!]!,0.42);
-      if(!b&&detail==='detail'){g.circle(p.x,p.y+HH,2.5).fill({color:COVERAGE[city.zones[i]!]!,alpha:.9});}
+      if(!b){
+        // Vacant zoned land has a visible foundation even at overview zoom:
+        // a zoned lot is NOT an already built home/shop/factory.
+        g.poly([p.x-12,p.y+HH,p.x,p.y+HH-6,p.x+12,p.y+HH,p.x,p.y+HH+6])
+          .stroke({width:1.6,color:0xfff4d2,alpha:.92,join:'round'});
+        if(detail==='detail'){
+          g.moveTo(p.x-8,p.y+HH-1).lineTo(p.x+8,p.y+HH+1)
+            .stroke({width:1.3,color:0xffffff,alpha:.68});
+        }
+      }
     }
     if(city.roads[i]){
       diamond(g,p.x,p.y,city.roads[i]===2?0x485b6f:0x647879);
