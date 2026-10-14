@@ -33,7 +33,7 @@ describe('derived neighborhood attractiveness',()=>{
     const near=tileIndex(30,31),far=tileIndex(10,10);
     city.buildings=[{id:100,x:30,y:30,kind:3,level:3,residents:0,jobs:140}];
     const before=analyzeLand(city);
-    expect(before.values[near]).toBeLessThan(before.values[far]);
+    expect(before.values[near]!).toBeLessThan(before.values[far]!);
     city.roads[tileIndex(30,32)]=1;
     const normal=analyzeLand(city).values[near]!;
     expect(normal).toBeGreaterThan(before.values[near]!);
