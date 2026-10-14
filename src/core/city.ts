@@ -1,5 +1,5 @@
 /** All game logic is deterministic and independent of the renderer and browser storage. */
-import { analyzeTraffic } from './traffic';
+import { analyzeTraffic, ROAD_CAPACITY } from './traffic';
 import { SIZE } from './grid';
 export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
@@ -166,7 +166,7 @@ export function canPlaceAt(city:City,tool:Tool,x:number,y:number):boolean {
 export function describeTile(city:City,x:number,y:number):string{
   if(!inside(x,y))return '';
   if(city.land[idx(x,y)]===0)return '川・水域';
-  if(city.roads[idx(x,y)])return '道路：建設済み';
+  if(city.roads[idx(x,y)]){const load=Math.round(analyzeTraffic(city).roadVolume[idx(x,y)]??0);return `道路：推定交通負荷 ${load} / 基準容量 ${ROAD_CAPACITY}${load>ROAD_CAPACITY?'（混雑）':''}`;}
   const s=serviceAt(city,x,y);if(s)return `${serviceNames[s.kind]}：運営中`;
   const b=buildingAt(city,x,y);if(b)return `${zoneNames[b.kind]}建物 Lv.${b.level} ／ 居住 ${b.residents}人 ／ 雇用 ${b.jobs}人`;
   return city.zones[idx(x,y)]?`${zoneNames[city.zones[idx(x,y)]!]}地区：開発待ち`:'空き地：開発できます';
