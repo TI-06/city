@@ -54,7 +54,7 @@ export function createCity(name = 'みどり野市', seed = 12937): City {
     return Math.abs(x-river)<=1 || lake ? 0 : 1;
   });
   const city: City = {schema:1, name,seed,random:seeded(seed)||1,month:0,funds:38000,tax:9,policy:'balanced',land,
-    roads:Array(SIZE*SIZE).fill(0), zones:Array(SIZE*SIZE).fill(0),buildings:[],services:[],nextId:1,history:[],paused:true,speed:1,maintenancePlan:'standard',maintenanceBacklog:0,capitalProjects:{transit:0,housing:0,culture:0},fiscalMode:'normal',debt:0,debtPrincipalMonthly:0};
+    roads:Array(SIZE*SIZE).fill(0), zones:Array(SIZE*SIZE).fill(0),buildings:[],construction:[],services:[],nextId:1,history:[],paused:true,speed:1,maintenancePlan:'standard',maintenanceBacklog:0,capitalProjects:{transit:0,housing:0,culture:0},fiscalMode:'normal',debt:0,debtPrincipalMonthly:0};
   for (let x=17;x<=41;x++) for(const y of [23,31,39]) city.roads[idx(x,y)]=1;
   for (let y=18;y<=44;y++) for(const x of [20,29,38]) city.roads[idx(x,y)]=1;
   for (let y=18;y<=44;y++) for(let x=17;x<=42;x++){
