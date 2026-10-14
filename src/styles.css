@@ -409,3 +409,15 @@
   .map-construction-focus{top:72px}
   .app-shell[data-tools-open="yes"] .map-operations{bottom:calc(258px + env(safe-area-inset-bottom))}
 }
+
+/* Keep decisions that affect gameplay on the persistent city map. */
+.map-operations-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.map-budget-controls{display:grid;gap:9px;margin-top:11px}
+.map-budget-condition{display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;padding:8px 9px;border-radius:8px;background:#e8f2ea;font-size:10px}
+.map-budget-condition strong{font-size:11px;color:#225842}
+.map-budget-options{display:flex;gap:5px;flex-wrap:wrap}
+.map-budget-options button{min-height:37px;flex:1;min-width:68px;border-radius:8px;background:white;border:1px solid #d1e4d4;padding:7px 5px;color:#38664d;font-size:10px;font-weight:750}
+.map-budget-options button.selected{background:#d7eddd;border-color:#278254;box-shadow:inset 0 0 0 1px #278254}
+.map-budget-borrow{padding:10px;background:#315f76;color:white;font-weight:800;font-size:11px;border-radius:8px}
+.map-budget-borrow:disabled{opacity:.48}
+@media(max-width:700px){.map-budget-options button{min-width:64px}.map-operations-tabs button{font-size:10px}}
