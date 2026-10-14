@@ -68,7 +68,7 @@ test('a mayor can jump to the active construction site and watch a real district
   await expect(focus).toBeVisible();
   await expect(focus).toContainText('工事中');
   await focus.click();
-  await expect(canvas).toHaveAttribute('data-focused-tile',/^\\d+,\\d+$/);
+  await expect(canvas).toHaveAttribute('data-focused-tile',/^\d+,\d+$/);
   await expect(canvas).toBeVisible();
   expect(errors).toEqual([]);
 });
