@@ -96,3 +96,10 @@ PCとモバイルのChromiumで、マップ描画、建設操作切替、ズー�
 `npm run verify` checks TypeScript, Vitest and Vite build. The GitHub Actions workflow also runs Playwright Chromium tests on desktop and mobile emulation. E2E checks the traffic tab, map legend, and core interactions.
 
 Deferred: dynamic lane capacity, intersections/signals, public transit, destination-choice capacity matching, dedicated freight origin-destination routes, and alternate-route congestion assignment.
+
+
+### Phase 2 mobility-policy lever
+- New **公共交通重視** city policy models public-transport subsidies and staggered commutes. Aggregate equivalent peak car trips fall to 45% of normal; employment does not fall.
+- City operating expenses increase by 90 C + 0.14 C × population per month.
+- When congestion is high, reduced traffic may recover resident happiness and enterprise efficiency; the municipal budget pays for the improvement. It is not an automatic free bonus.
+- This is an economy-level policy, not yet a rendered physical bus or rail network. Save schema remains v1; previous policies and saves remain compatible.
