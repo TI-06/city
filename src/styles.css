@@ -74,3 +74,19 @@
 .capital-invest:disabled{background:#dfe7e4;color:#849990;cursor:not-allowed}
 .capital-invest:focus-visible{outline:3px solid #55b4ea;outline-offset:2px}
 @media(max-width:920px){.capital-grid{grid-template-columns:1fr}.capital-card{padding:12px}}
+
+/* Phase 4: municipal recovery, readable on narrow screens */
+.fiscal-panel{margin-top:20px;padding:16px;border:1px solid #d5e3df;border-radius:13px;background:#f8fbfa}
+.fiscal-status{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center;padding:12px 14px;background:#edf3f3;border-radius:9px;color:#294d46}
+.fiscal-status strong{font-size:13px}.fiscal-status span{font-size:11px;line-height:1.6;color:#5a7770}
+.fiscal-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.fiscal-choice{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:12px;border:1px solid #dae7df;background:#fff;border-radius:10px;cursor:pointer;text-align:left}
+.fiscal-choice.current{border-color:#32936e;background:#eef9f2;box-shadow:inset 0 0 0 1px #32936e}
+.fiscal-choice b{font-size:12px;color:#20483a}.fiscal-choice small{color:#657d72;font-size:10px;line-height:1.6}
+.fiscal-choice:focus-visible,.fiscal-borrow:focus-visible{outline:3px solid #51a7e8;outline-offset:2px}
+.fiscal-debt-row{display:flex;gap:12px;align-items:center;justify-content:space-between;border-top:1px solid #dceae1;padding-top:13px}
+.fiscal-debt-row div{display:flex;flex-direction:column;gap:4px}.fiscal-debt-row small{font-size:10px;color:#637e70}
+.fiscal-debt-row strong{font-size:13px;color:#214b3e}
+.fiscal-borrow{background:#254f6c;color:white;border:0;border-radius:9px;min-height:37px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer}
+.fiscal-borrow:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:700px){.fiscal-panel{padding:12px}.fiscal-actions{grid-template-columns:1fr}.fiscal-debt-row{flex-direction:column;align-items:stretch}}

@@ -148,3 +148,25 @@ test('capital investment spends city budget and survives a save/reload',async ({
   await expect(page.getByText('支援後の家賃負担')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('austerity and borrowing are available on desktop/mobile and saved safely', async ({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  page.on('dialog',dialog=>{void dialog.accept();});
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'財政と経済'}).click();
+  await expect(page.getByText('財政再建・市債')).toBeVisible();
+  const austerity=page.getByRole('button',{name:/支出抑制/});
+  await austerity.click();
+  await expect(austerity).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:'市債を発行する'}).click();
+  await expect(page.getByText('毎月の返済（元金＋利息）')).toBeVisible();
+  await page.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(page.getByText('手動保存完了')).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'財政と経済'}).click();
+  await expect(page.getByRole('button',{name:/支出抑制/})).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByText('財政再建・市債')).toBeVisible();
+  expect(errors).toEqual([]);
+});
