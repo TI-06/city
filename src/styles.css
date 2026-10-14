@@ -105,3 +105,25 @@
 
 /* Keep the civic status readable on mobile: the old compact heading hides all spans. */
 @media(max-width:600px){.map-heading .map-civic-indicator{display:inline-flex}.map-heading .map-heading-right{display:flex}}
+
+
+/* Phase 4-7: clearly surfaced progression and playable development feedback. */
+.time-buttons .next-month-button{background:#e5f1e9;color:#246d51;border:1px solid #bcdccb;padding:7px 11px;min-width:auto;font-weight:800}
+.time-buttons .next-month-button:hover{background:#d1e9dc;color:#19563d}
+.development-panel{margin-top:12px;padding:17px 19px;background:#fff;border:1px solid #dce9e2;border-radius:13px;box-shadow:0 4px 18px #173c2310}
+.development-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+.development-header strong{font-size:14px;color:#2a5446}.development-header span{font-size:11px;color:#876c48;background:#fff2dc;padding:5px 9px;border-radius:12px;font-weight:750}
+.development-counts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.development-counts>div{background:#f5f9f6;border:1px solid #e3eee5;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.development-counts small{font-size:10px;font-weight:750;color:#6d8980}
+.development-counts strong{font-size:22px;color:#2b574a;line-height:1.2}
+.development-counts em{font-size:10px;font-style:normal;margin-left:5px;color:#85968e}
+.development-counts span{font-size:10px;color:#5c8c75}
+.development-guidance{color:#405f54;font-size:12px;line-height:1.7;margin:13px 0 0}
+.development-disconnected{margin:8px 0 0;color:#b0693d;font-size:11px}
+.development-actions{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:14px;padding-top:13px;border-top:1px solid #e8f0ea}
+.development-actions span{font-size:11px;color:#71857e;line-height:1.5;max-width:60%}
+.development-actions button{background:#2c8060;color:#fff;border-radius:8px;padding:10px 14px;font-size:12px;font-weight:800;white-space:nowrap}
+.development-actions button:hover{background:#22694f}
+@media(max-width:760px){.development-panel{padding:14px}.development-actions{flex-direction:column;align-items:stretch}.development-actions span{max-width:100%}.development-counts{gap:5px}.development-counts>div{padding:9px 7px}.development-counts strong{font-size:20px}.development-counts small{font-size:9px}.development-actions button{width:100%}}
+@media(max-width:600px){.time-buttons .next-month-button{font-size:10px;padding:7px 8px}.development-header strong{font-size:13px}.development-header span{font-size:10px}}
