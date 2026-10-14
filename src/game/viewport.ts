@@ -47,10 +47,10 @@ export function needsTileWindowRefresh(
 ):boolean{
   if(!cached)return visible!==null;
   if(!visible)return true;
-  return visible.minX<cached.minX+guard
-    ||visible.maxX>cached.maxX-guard
-    ||visible.minY<cached.minY+guard
-    ||visible.maxY>cached.maxY-guard;
+  return (cached.minX>0&&visible.minX<cached.minX+guard)
+    ||(cached.maxX<SIZE-1&&visible.maxX>cached.maxX-guard)
+    ||(cached.minY>0&&visible.minY<cached.minY+guard)
+    ||(cached.maxY<SIZE-1&&visible.maxY>cached.maxY-guard);
 }
 
 export function structureDetailAtZoom(zoom:number):StructureDetail{
@@ -59,4 +59,18 @@ export function structureDetailAtZoom(zoom:number):StructureDetail{
 
 export function tileCount(window:TileWindow|null):number{
   return window?(window.maxX-window.minX+1)*(window.maxY-window.minY+1):0;
+}
+
+/**
+ * Tight screen-space cull after the tile-window prefilter.
+ * Extra pixels protect clipped building roofs and camera drags between rebuilds.
+ */
+export function tileNearViewport(
+  x:number,y:number,width:number,height:number,
+  panX:number,panY:number,zoom:number,
+  overscanPx=Math.max(40,zoom*210),
+):boolean{
+  const sx=(x-y)*HW*zoom+panX,sy=(x+y)*HH*zoom+panY;
+  return sx>=-overscanPx&&sx<=width+overscanPx
+    &&sy>=-overscanPx&&sy<=height+overscanPx;
 }
