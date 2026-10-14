@@ -52,7 +52,9 @@ export function assessHousing(
   const pressure=clamp(targetResidents/Math.max(1,capacity),0.65,1.75);
   const estimatedRent=Math.round((2.5+averageHousingLand*0.035)*pressure*10)/10;
   // Explicit estimated non-wage household support avoids a zero-income divide.
-  const availableIncome=4+18*employed/Math.max(1,occupied);
+  // Empty new towns have potential wage earners rather than zero-income tenants.
+  const workingShare=occupied>0?employed/occupied:Math.min(0.53,jobSlots*0.53/Math.max(12,capacity));
+  const availableIncome=4+18*workingShare;
   const rentBurden=Math.round(100*estimatedRent/availableIncome);
   const affordability=Math.round(clamp(110-1.4*Math.max(0,rentBurden-28),0,100));
   const workingPopulation=Math.round(occupied*0.53);
