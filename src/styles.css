@@ -127,3 +127,148 @@
 .development-actions button:hover{background:#22694f}
 @media(max-width:760px){.development-panel{padding:14px}.development-actions{flex-direction:column;align-items:stretch}.development-actions span{max-width:100%}.development-counts{gap:5px}.development-counts>div{padding:9px 7px}.development-counts strong{font-size:20px}.development-counts small{font-size:9px}.development-actions button{width:100%}}
 @media(max-width:600px){.time-buttons .next-month-button{font-size:10px;padding:7px 8px}.development-header strong{font-size:13px}.development-header span{font-size:10px}}
+
+
+/* Phase 4-8 | Mobile is a game viewport, not a long desktop dashboard. */
+.mobile-menu-button,.mobile-utilities,.mobile-build-categories,.mobile-dock-toggle,.mobile-progress-chip,.mobile-tile-info{display:none}
+@media(max-width:700px){
+  html,body,#root{width:100%;height:100%;height:100dvh;overflow:hidden}
+  body{overscroll-behavior:none}
+  .app-shell{height:100dvh;min-height:0;padding:0;display:flex;overflow:hidden;background:#a7c2a6}
+  .workspace{height:100dvh;min-height:0;width:100%;display:flex;flex-direction:column;overflow:hidden;background:#dfebdf}
+  .topbar{height:42px;min-height:42px;padding:0 12px;flex:none;box-shadow:0 2px 12px #183e321a;z-index:6}
+  .breadcrumb{font-size:10px;letter-spacing:1px}
+  .breadcrumb>span{padding:0 5px}
+  .top-actions{gap:5px}
+  .top-actions .autosave{font-size:9px;margin-right:2px;white-space:nowrap}
+  .top-button{padding:8px;border-radius:8px;font-size:10px;min-height:34px}
+  .mobile-menu-button{display:inline-flex;align-items:center;justify-content:center;min-width:34px;font-size:15px;color:#295345}
+  .city-bar{flex:none;display:flex;flex-direction:column;align-items:stretch;gap:4px;padding:9px 12px 8px;background:#f4f9f4}
+  .city-bar>div:first-child .eyebrow,.city-bar>div:first-child p,.city-heading .level-tag{display:none}
+  .city-heading{margin:0}.city-heading h1{font-size:17px;letter-spacing:0;color:#244c3e}
+  .time-control{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .date-label{font-size:11px;font-weight:900;white-space:nowrap}
+  .time-buttons{padding:2px;gap:2px;border-radius:10px}
+  .time-buttons button{min-width:30px;min-height:33px;padding:5px 6px;font-size:11px;border-radius:8px}
+  .time-buttons .next-month-button{min-width:69px;min-height:33px;font-size:10px;padding:5px 7px}
+  .stat-strip{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:7px 9px 7px;background:#f4f9f4}
+  .stat{min-height:55px;padding:8px 7px;border-radius:9px;box-shadow:none;overflow:hidden;background:white}
+  .stat>span{font-size:9px;margin-bottom:6px;white-space:nowrap}
+  .stat strong,.stat strong small{font-size:clamp(10px,3.1vw,16px);letter-spacing:-.5px}
+  .stat strong{line-height:1.1;overflow:hidden;text-overflow:ellipsis;display:block}
+  .stat em,.stat .mini-progress{display:none}
+  .content-area{display:flex;flex:1;min-height:0;gap:0;padding:0;width:100%;position:relative}
+  .main-panel{display:flex;flex-direction:column;flex:1;min-height:0;position:relative;width:100%}
+  .map-heading{height:33px;min-height:33px;display:flex;justify-content:space-between;align-items:center;padding:0 11px;background:#e3eee4}
+  .map-heading strong{font-size:12px}.map-heading span{display:none}
+  .map-heading .map-status{display:none}
+  .map-heading .map-civic-indicator{display:inline-flex!important;font-size:9px;padding:3px 7px}
+  .map-heading .map-size{display:none}
+  .map-host{flex:1;min-height:0;height:auto!important;width:100%;border:0;border-radius:0;box-shadow:none;background:#aed0a6}
+  .map-hint{display:none}
+  .map-floating-toolbar{top:11px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;max-width:50%;z-index:5;flex-wrap:nowrap}
+  .view-modes,.zoom-controls{display:flex;flex-direction:column;align-items:stretch;gap:3px;padding:5px;background:#f6fff1e8;border:1px solid #bcd5c2;border-radius:13px;box-shadow:0 5px 18px #174c3830}
+  .map-floating-toolbar button{min-width:43px;min-height:43px;height:43px;padding:0 7px;font-size:14px;border-radius:10px;touch-action:manipulation}
+  .view-modes button{min-width:61px;font-size:11px}
+  .zoom-controls button{width:43px}
+  .map-civic-indicator{white-space:nowrap}
+  .mobile-progress-chip{display:flex;flex-direction:column;gap:5px;position:absolute;top:12px;left:10px;z-index:4;padding:10px 11px;border-radius:13px;background:#153e32df;color:#f1ffef;font-weight:800;font-size:11px;max-width:58%;box-shadow:0 6px 20px #0925183b;pointer-events:none}
+  .mobile-progress-chip span:last-child{font-size:10px;color:#bce7c9;font-weight:650}
+  .mobile-tile-info{display:block;position:absolute;top:82px;left:10px;z-index:5;background:#fafff4f5;border:1px solid #d5e8d7;border-radius:12px;padding:10px 12px;max-width:62%;box-shadow:0 8px 18px #0a241f26}
+  .mobile-tile-info>div{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .mobile-tile-info strong{color:#235640;font-size:11px}
+  .mobile-tile-info button{background:#e5f1e8;color:#305c4a;border-radius:6px;min-width:29px;min-height:29px}
+  .mobile-tile-info p{font-size:10px;line-height:1.6;margin:6px 0 0;color:#4d715e}
+  .notice{position:fixed;left:10px;right:10px;bottom:calc(80px + env(safe-area-inset-bottom));margin:0;z-index:12;max-height:68px;min-height:0;overflow:auto;border:1px solid #a6cbb0;border-radius:11px;background:#f1fcf0ee;color:#255944;box-shadow:0 4px 20px #172e2430;font-size:11px;padding:8px 10px;pointer-events:none}
+  .app-shell[data-active-menu="build"][data-tools-open="yes"] .notice{bottom:calc(226px + env(safe-area-inset-bottom))}
+  .app-shell[data-active-menu="build"][data-tools-open="no"] .notice{bottom:calc(119px + env(safe-area-inset-bottom))}
+  .sidebar{position:fixed;bottom:0;left:0;right:0;width:100%;height:calc(64px + env(safe-area-inset-bottom));min-height:0;padding:5px 6px calc(5px + env(safe-area-inset-bottom));z-index:20;background:#143329;box-shadow:0 -8px 26px #0b2c1f3b}
+  .sidebar .brand,.sidebar .sidebar-bottom,.sidebar .sidebar-section-label{display:none}
+  .menu{display:flex;flex-direction:row;justify-content:space-between;gap:3px;width:100%;height:100%}
+  .menu-link{width:20%;min-width:0;height:53px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 1px;font-size:10px;line-height:1.1;border-radius:11px;white-space:nowrap}
+  .menu-link .menu-icon{font-size:21px;width:auto;line-height:1.1}
+  .menu-link.active{background:#327558;color:white}
+  .menu-link.active .menu-icon{color:#c5ffe0}
+  .menu-link .menu-dot{display:none}
+  .build-panel{position:fixed;bottom:calc(64px + env(safe-area-inset-bottom));left:0;right:0;width:100%;height:auto;min-height:0;margin:0;z-index:15;background:#f6faf5;border:1px solid #d1e5d6;border-bottom:0;border-radius:18px 18px 0 0;box-shadow:0 -8px 28px #193b2c35;padding:9px 11px 12px}
+  .build-panel .panel-title{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:0 0 9px;min-height:25px}
+  .build-panel .panel-title strong{font-size:12px}
+  .build-panel .panel-title>span{display:none}
+  .build-panel .undo-button{margin-left:auto;font-size:10px;padding:6px 8px;min-height:31px}
+  .mobile-dock-toggle{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:31px;background:#e4f1e7;border-radius:9px;color:#255a46;font-size:11px;font-weight:800;padding:5px 9px}
+  .mobile-build-categories{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:0 0 9px}
+  .mobile-build-categories button{display:flex;justify-content:center;align-items:center;gap:3px;white-space:nowrap;min-height:38px;background:#e7eee8;color:#526e62;border:1px solid #d5e1d8;border-radius:9px;font-size:10px;font-weight:750;padding:5px 2px}
+  .mobile-build-categories button.selected{background:#2f8060;border-color:#2f8060;color:#fff}
+  .mobile-build-categories button span{font-size:14px}
+  .build-panel .tool-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .build-panel .tool-tile{min-height:65px;padding:7px 4px;gap:3px;background:#fff;border-radius:10px;touch-action:manipulation}
+  .build-panel .tool-tile .tool-glyph{font-size:21px}
+  .build-panel .tool-tile strong{font-size:11px}
+  .build-panel .tool-tile small{font-size:9px}
+  .build-panel[data-mobile-category="zones"] .tool-tile:not([data-category="zones"]),
+  .build-panel[data-mobile-category="roads"] .tool-tile:not([data-category="roads"]),
+  .build-panel[data-mobile-category="services"] .tool-tile:not([data-category="services"]),
+  .build-panel[data-mobile-category="manage"] .tool-tile:not([data-category="manage"]){display:none}
+  .build-panel.dock-collapsed{padding-bottom:8px}
+  .build-panel.dock-collapsed .mobile-build-categories,.build-panel.dock-collapsed .tool-grid{display:none}
+  .development-panel{display:none}
+  .main-panel>.data-panel{position:fixed;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom));z-index:15;margin:0;max-height:min(58dvh,620px);overflow-y:auto;overscroll-behavior:contain;padding:16px 15px 20px;border-radius:19px 19px 0 0;background:#fff;box-shadow:0 -9px 30px #132d2b40;scrollbar-width:thin}
+  .main-panel>.data-panel:before{content:"";display:block;width:42px;height:5px;border-radius:20px;background:#c8dacf;margin:0 auto 12px}
+  .main-panel>.data-panel .panel-title{margin-bottom:12px}
+  .main-panel>.data-panel .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .main-panel>.data-panel .metric-grid>div{padding:10px}
+  .main-panel>.data-panel .metric-grid b{font-size:13px}
+  .main-panel>.data-panel .policy-grid,.main-panel>.data-panel .maintenance-options,.main-panel>.data-panel .capital-grid{grid-template-columns:1fr}
+  .main-panel>.data-panel .fiscal-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .main-panel>.data-panel button{touch-action:manipulation}
+  .inspector{display:none}
+  .mobile-utilities{display:flex;flex-direction:column;gap:7px;position:fixed;z-index:30;top:44px;right:10px;width:min(290px,calc(100vw - 20px));max-height:60dvh;overflow-y:auto;background:#fff;border:1px solid #dbeade;border-radius:14px;box-shadow:0 15px 40px #0d281f42;padding:13px}
+  .mobile-utilities-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:6px;color:#234836}
+  .mobile-utilities button{padding:11px 12px;min-height:43px;text-align:left;background:#e9f3ed;color:#245744;border-radius:9px;font-size:12px;font-weight:700}
+  .mobile-utilities-head button{padding:5px 9px;min-height:31px}
+  .land-legend,.traffic-legend{top:auto;bottom:14px;right:10px;max-width:72%;z-index:5}
+  .modal-backdrop{z-index:40}.modal{padding:20px;max-height:85dvh;overflow:auto}
+}
+@media(max-width:370px){
+  .time-control{flex-wrap:wrap}
+  .time-buttons{width:100%;justify-content:space-between}
+  .city-bar{gap:2px;padding-top:5px;padding-bottom:5px}
+  .mobile-build-categories button{font-size:9px}
+  .menu-link{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+  .build-panel,.main-panel>.data-panel,.mobile-progress-chip{animation:none!important;transition:none!important}
+}
+
+.mobile-build-advice{display:none}
+@media(max-width:700px){
+ .mobile-build-advice{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:#5c7467;font-size:10px;line-height:1.45;margin:8px 2px 0}
+ .build-panel.dock-collapsed .mobile-build-advice{display:none}
+ .app-shell[data-active-menu="build"][data-tools-open="yes"] .notice{bottom:calc(255px + env(safe-area-inset-bottom))}
+}
+
+/* Phase 5: city growth should feel like an event, not a silent number change. */
+.city-growth-moment{position:absolute;z-index:8;bottom:15px;left:12px;max-width:min(375px,calc(100% - 24px));display:flex;align-items:flex-start;gap:9px;background:#173d34ee;color:#f8fff3;border:1px solid #7bbba3;border-radius:14px;padding:12px 9px 12px 12px;box-shadow:0 9px 28px #0d2e2b70;animation:cityMomentIn .34s cubic-bezier(.17,.82,.33,1.25) both}
+.city-growth-moment .city-growth-spark{font-size:22px;color:#f7d685;line-height:1.1}
+.city-growth-moment>div{flex:1;min-width:0}
+.city-growth-moment strong{font-size:13px;color:#f9f2ca;display:block}
+.city-growth-moment p{margin:5px 0 0;font-size:11px;line-height:1.55;color:#d2e9dc}
+.city-growth-moment button{color:#eaf6ee;background:#3e6759;border-radius:8px;min-width:29px;min-height:29px;font-size:11px}
+.city-growth-moment.moment-milestone{border-color:#efd285;background:#55462deE}
+.city-growth-moment.moment-milestone .city-growth-spark{color:#ffe39a}
+@keyframes cityMomentIn{from{opacity:0;transform:translateY(18px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:700px){
+  .city-growth-moment{position:fixed;bottom:calc(295px + env(safe-area-inset-bottom));left:9px;right:auto;z-index:16;max-width:min(260px,70vw);padding:10px 8px;gap:7px}
+  .city-growth-moment strong{font-size:11px}.city-growth-moment p{font-size:10px}
+  .app-shell[data-active-menu="build"][data-tools-open="no"] .city-growth-moment{bottom:calc(145px + env(safe-area-inset-bottom))}
+  .app-shell:not([data-active-menu="build"]) .city-growth-moment{bottom:calc(80px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){.city-growth-moment{animation:none}}
+
+/* Fix flex cross-axis sizing on Pixel-sized screens: desktop align-items:start
+ * must not collapse the canvas-containing main column to intrinsic height. */
+@media(max-width:700px){
+ .content-area{align-items:stretch!important}
+ .main-panel{height:100%;min-height:0;align-self:stretch}
+ .map-host{flex:1 1 0%;min-height:0!important}
+}

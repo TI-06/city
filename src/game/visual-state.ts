@@ -34,11 +34,20 @@ export function detectGrowthEvents(before:City,after:City,limit=10):readonly Gro
   return events;
 }
 
-/** A single pulse lives for 3 seconds; keep max 10 concurrent markers. */
+/** Construction unfolds through foundations, framing and finishing. */
+export const CONSTRUCTION_SECONDS=5;
+export type ConstructionStage='foundation'|'frame'|'finish'|'done';
+export function constructionStage(elapsedSeconds:number):ConstructionStage{
+  if(elapsedSeconds<CONSTRUCTION_SECONDS*.22)return 'foundation';
+  if(elapsedSeconds<CONSTRUCTION_SECONDS*.77)return 'frame';
+  if(elapsedSeconds<CONSTRUCTION_SECONDS)return 'finish';
+  return 'done';
+}
+/** A single construction scene lasts five seconds; keep max 10 concurrent markers. */
 export type GrowthPulse=GrowthEvent&Readonly<{createdAt:number}>;
 export function appendGrowthPulses(current:readonly GrowthPulse[],changes:readonly GrowthEvent[],time:number):GrowthPulse[] {
   return [
-    ...current.filter(p=>time-p.createdAt<3),
+    ...current.filter(p=>time-p.createdAt<CONSTRUCTION_SECONDS),
     ...changes.map(change=>({...change,createdAt:time})),
   ].slice(-10);
 }

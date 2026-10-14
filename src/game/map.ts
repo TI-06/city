@@ -1,17 +1,16 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js';
-import { buildAmbientScene, type AmbientScene } from './ambient';
+import { buildAmbientScene, sampleVehicle, sampleWalker, nightLevel, type AmbientScene } from './ambient';
 import {visibleTileWindow,paddedTileWindow,needsTileWindowRefresh,structureDetailAtZoom,tileNearViewport,type TileWindow,type StructureDetail} from './viewport';
-import {appendGrowthPulses,detectGrowthEvents,visualMood,type CityMood,type GrowthPulse} from './visual-state';
-import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
+import {appendGrowthPulses,detectGrowthEvents,visualMood,constructionStage,CONSTRUCTION_SECONDS,type CityMood,type GrowthPulse} from './visual-state';
+import { canPlaceAt, type City, type Building, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { analyzeLand } from '../core/land';
+import {getBuildingStyle} from './building-style';
 import { appendLine, canDragPaint, insideTile, type InteractionMode, type TilePoint } from '../core/paint';
 
 const HW = 26;
 const HH = 13;
 const GROUND = [0x84bb77, 0x8bc480, 0x7caf74, 0x92c686, 0x83b974];
-const ROOFS = [0, 0xe9b27a, 0x8cb7c4, 0xb6a5a0];
-const WALLS = [0, 0xf1dcc3, 0xdce9e6, 0xc4b8b0];
 const COVERAGE = [0, 0xcceaaa, 0x92d6cf, 0xe6bb9d];
 const SERVICE_COLORS = {park:0x5d9862,school:0xe8bd70,clinic:0xe6e7e0};
 const tilePosition = (x:number,y:number)=>({x:(x-y)*HW,y:(x+y)*HH});
@@ -56,6 +55,82 @@ function buildingBox(g:Graphics,x:number,y:number,h:number,top:number,left:numbe
     }
   }
 }
+/** Draw distinct skylines per district and level; only derived building geometry.
+ * Details are omitted at overview zoom for mobile GPU budgets.
+ */
+function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,detail:StructureDetail,progress=1){
+  const design=getBuildingStyle(b,seed),h=Math.max(6,Math.round(design.height*progress));
+  const roofline=y-h+5;
+  const isHome=b.kind===1;
+  const fittedVariant=isHome&&(design.silhouette==='pitched'||design.name==='townhouse')?1:b.kind===3?3:2;
+  buildingBox(g,x,y,h,design.roof,design.left,design.right,fittedVariant,progress<.9?'overview':detail);
+  // During construction only the block silhouette rises. Details and rooftop
+  // equipment arrive in the finishing stage, so the change is visible.
+  if(progress<.9)return;
+  if(design.silhouette==='pitched'){
+    // Raised ridge, chimney and porch visually distinguish small homes.
+    g.moveTo(x-18,y+HH-h+6).lineTo(x,y-h+3).lineTo(x+18,y+HH-h+6)
+      .stroke({color:0xffe4af,width:2.1});
+    g.rect(x+8,roofline-10,4,11).fill(0xac7963);
+    g.poly([x+5,roofline-10,x+10,roofline-13,x+14,roofline-10,x+9,roofline-7]).fill(0x8f5d53);
+    if(detail==='detail'){
+      g.poly([x-7,y+HH*2+2,x,y+HH*2-1,x+5,y+HH*2+2,x-2,y+HH*2+5])
+        .fill(0xe8cd98);
+      g.circle(x-16,y+HH+12,3).fill(0x4b9460);
+    }
+    return;
+  }
+  if(design.silhouette==='terraced'){
+    // Lowrise apartment balconies and row-house roof stair.
+    g.rect(x-9,roofline-6,12,5).fill(0xb7c6bd);
+    if(detail==='detail'){
+      for(let floor=0;floor<Math.min(5,Math.floor(h/12));floor++){
+        const yy=y+HH+5-floor*10;
+        g.moveTo(x+1,yy+8).lineTo(x+15,yy+1).stroke({color:design.accent,width:2.2,alpha:.8});
+      }
+    }
+  } else if(design.silhouette==='tower'||design.silhouette==='glass'){
+    // A slender stepped rooftop silhouette is visible even on overview.
+    g.poly([x-9,roofline,x,roofline-6,x+9,roofline,x,roofline+5]).fill(design.accent);
+    g.rect(x-2,roofline-11,4,7).fill(0x708b99);
+    if(detail==='detail'){
+      for(let floor=1;floor<Math.min(7,Math.floor(h/11));floor++){
+        const yy=y+HH+5-floor*9;
+        g.poly([x+4,yy,x+11,yy-3,x+11,yy+1,x+4,yy+4])
+          .fill({color:0xb7e6f3,alpha:.83});
+        g.poly([x-14,yy-8,x-7,yy-5,x-7,yy-1,x-14,yy-4])
+          .fill({color:0x8bc3de,alpha:.8});
+      }
+    }
+  } else if(design.silhouette==='awning'){
+    // Retail shopfronts have prominent colorful awnings/signage.
+    g.poly([x+1,y+HH+2,x+19,y+HH-8,x+19,y+HH-3,x+1,y+HH+7])
+      .fill(design.accent);
+    g.rect(x-8,roofline-5,16,4).fill(design.accent);
+    if(detail==='detail'){
+      g.poly([x+3,y+HH+13,x+10,y+HH+10,x+10,y+HH+19,x+3,y+HH+22])
+        .fill(0x476f78);
+      g.circle(x+14,y+HH+5,2).fill(0xfff2bd);
+    }
+  } else if(design.silhouette==='shed'){
+    // Wide low industrial roof with sawtooth highlights.
+    g.poly([x-17,roofline+7,x-10,roofline-2,x-3,roofline+5,x+5,roofline-4,x+14,roofline+7])
+      .fill({color:design.accent,alpha:.85});
+    if(detail==='detail'){
+      g.rect(x+4,y+HH+8,9,10).fill(0x617782);
+      g.rect(x+6,y+HH+11,5,4).fill(0xc0d3ce);
+    }
+  } else if(design.silhouette==='industrial'){
+    // Smokestack plus rooftop tanks makes a recognizable industrial plant.
+    g.rect(x+13,roofline-21,6,26).fill(0x768a8c);
+    g.rect(x+12,roofline-22,8,4).fill(design.accent);
+    g.ellipse(x+16,roofline-22,4,2).fill(0xb3c6be);
+    if(detail==='detail'){
+      g.circle(x-8,roofline-2,5).fill(0x95a6a1);
+      g.rect(x-11,roofline-5,6,4).fill(0xbdd1ce);
+    }
+  }
+}
 function renderTerrain(g:Graphics,city:City){
   g.clear();
   for(let sum=0;sum<2*SIZE-1;sum++)for(let y=Math.max(0,sum-SIZE+1);y<=Math.min(SIZE-1,sum);y++){
@@ -70,7 +145,8 @@ function renderTerrain(g:Graphics,city:City){
   }
 }
 function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:StructureDetail,
-  viewport:{width:number;height:number;panX:number;panY:number;zoom:number}):number{
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},
+  constructionTiles:ReadonlySet<number>=new Set()):number{
   g.clear();
   if(!window)return 0;
   let renderedTiles=0;
@@ -111,10 +187,7 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
       }
     }
     if(b){
-      const h=b.kind===1?13+b.level*7:b.kind===2?24+b.level*9:19+b.level*9;
-      const roof=ROOFS[b.kind]!+(v%3)*0x010101;
-      buildingBox(g,p.x,p.y,h,roof,WALLS[b.kind]!,b.kind===1?0xcba98c:b.kind===2?0x7ea5a5:0x9a8781,b.kind,detail);
-      if(b.kind===3&&detail==='detail'){g.rect(p.x+14,p.y-h-12,5,15).fill(0x889190);g.ellipse(p.x+16,p.y-h-16,6,3).fill({color:0xe2e6e0,alpha:.45});}
+      if(!constructionTiles.has(i))drawCityBuilding(g,p.x,p.y,b,city.seed,detail);
     } else if(s){
       if(s.kind==='park'){
         diamond(g,p.x,p.y,0x5e9c69);
@@ -139,35 +212,76 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
  */
 function renderAmbient(g:Graphics,scene:AmbientScene,time:number){
   g.clear();
+  const dusk=nightLevel(time);
+  // Routed cars and buses complete connected journeys, disappear at a stop,
+  // then resume a newly chosen trip. Only the active tiny sprites are drawn.
   for(const lane of scene.lanes){
-    const t=(1+Math.sin(time*2*Math.PI/lane.period+lane.phase*6.283))/2;
-    const a=tilePosition(lane.x,lane.y),b=tilePosition(lane.toX,lane.toY);
-    const px=a.x+(b.x-a.x)*t,py=a.y+(b.y-a.y)*t+HH;
-    g.ellipse(px+1,py+3,lane.bus?7:4.5,lane.bus?3:2.6).fill({color:0x203b41,alpha:.19});
-    g.ellipse(px,py,lane.bus?6:3.8,lane.bus?2.9:2.1)
-      .fill({color:lane.bus?0x56d3f1:0xf5e6b6,alpha:.98});
-    if(lane.bus)g.circle(px+1,py,1).fill({color:0xffffff,alpha:.85});
-  }
-  for(const f of scene.factories){
-    const p=tilePosition(f.x,f.y);
-    for(let i=0;i<3;i++){
-      const progress=(time*.21+f.phase+i/3)%1;
-      g.circle(p.x+16+progress*13,p.y-28-progress*27,2.3+progress*4.3)
-        .fill({color:0xe8e9e6,alpha:.33*(1-progress)});
+    const moving=sampleVehicle(lane,time);
+    if(!moving)continue;
+    const p=tilePosition(moving.x,moving.y),py=p.y+HH;
+    const bus=moving.bus;
+    g.ellipse(p.x+2,py+4,bus?7:5,bus?3:2.8).fill({color:0x152b31,alpha:.22*moving.alpha});
+    g.ellipse(p.x,py,bus?6.6:4.3,bus?3:2.5)
+      .fill({color:bus?0x39cbed:0xf2dd9a,alpha:moving.alpha});
+    g.circle(p.x-1,py-1,1).fill({color:bus?0xeaffff:0xffffff,alpha:moving.alpha});
+    if(dusk>.15){
+      const dx=(moving.directionX-moving.directionY)*2.5;
+      const dy=(moving.directionX+moving.directionY)*1.2;
+      g.circle(p.x+dx,py+dy,1.8).fill({color:0xfff6c9,alpha:dusk*.8*moving.alpha});
     }
   }
+  // Walkers are present only while travelling; idle and shopping periods
+  // deliberately produce a less mechanical, intermittently alive street.
+  for(const walker of scene.pedestrians){
+    const moving=sampleWalker(walker,time);
+    if(!moving)continue;
+    const p=tilePosition(moving.x,moving.y),ground=p.y+HH+6;
+    g.ellipse(p.x+3,ground+3,2.7,1.4).fill({color:0x1b473b,alpha:.2*moving.alpha});
+    g.circle(p.x,ground-4,2.1).fill({color:walker.residents>0?0xffda9a:0xb5c9e7,alpha:moving.alpha});
+    g.moveTo(p.x,ground-1).lineTo(p.x,ground+3).stroke({width:1.5,color:0x355d70,alpha:moving.alpha});
+  }
+  // Workday smoke appears in separate bursts, with offsets per factory.
+  for(const f of scene.factories){
+    const p=tilePosition(f.x,f.y),cycle=(time+f.phase*13)/11;
+    const batch=Math.floor(cycle),local=cycle-batch;
+    if(batch%5===3)continue;
+    for(let i=0;i<3;i++){
+      const age=(local*1.45-i*.28);
+      if(age<=0||age>=1)continue;
+      const side=Math.sin(batch*3.1+i*1.7+f.phase*5)*5;
+      g.circle(p.x+15+side+age*9,p.y-26-age*28,2+age*4.8)
+        .fill({color:0xe3e7df,alpha:(1-age)*.35});
+    }
+  }
+  // Parks and waterways become active at different moments rather than
+  // repeating the same ellipse position on every frame.
   for(const park of scene.parks){
-    const p=tilePosition(park.x,park.y);
-    const wobble=time*1.2+park.phase*6.28;
-    g.circle(p.x+Math.sin(wobble)*8,p.y+HH-4+Math.cos(wobble*1.7)*5,2)
-      .fill({color:0xffe8a0,alpha:.7});
+    const phase=(time*.14+park.phase)%1;
+    if(phase>.64)continue;
+    const p=tilePosition(park.x,park.y),sweep=phase/.64;
+    g.circle(p.x-12+sweep*21,p.y+HH+Math.sin(sweep*6)*5,1.9)
+      .fill({color:0xffe49c,alpha:Math.min(1,sweep*5,(1-sweep)*5)*.85});
   }
   for(const water of scene.water){
-    const p=tilePosition(water.x,water.y);
-    const alpha=.12+.24*(.5+.5*Math.sin(time*1.5+water.phase*6.28));
-    const offset=Math.sin(time*.7+water.phase*9)*5;
-    g.moveTo(p.x-9+offset,p.y+HH-2).lineTo(p.x+3+offset,p.y+HH-5)
-      .stroke({color:0xe3fcfd,width:1.6,alpha});
+    const phase=(time*.12+water.phase)%1;
+    if(phase>.6)continue;
+    const p=tilePosition(water.x,water.y),progress=phase/.6;
+    const x=p.x-15+progress*26;
+    g.moveTo(x,p.y+HH-2).lineTo(x+8,p.y+HH-5)
+      .stroke({color:0xe1fdff,width:1.5,alpha:(1-progress)*.5});
+  }
+  // Night activity is a separate small set of emissive windows, not a redraw
+  // of the 4,096-tile city. Their lights change across successive evenings.
+  if(dusk>.02){
+    for(const w of scene.windows){
+      const date=Math.floor(time/72);
+      if((Math.floor(w.phase*100)+date*7)%5===0)continue;
+      const p=tilePosition(w.x,w.y);
+      g.circle(p.x+7,p.y-11,3.5)
+        .fill({color:0xffdb8b,alpha:dusk*.26});
+      g.rect(p.x+5,p.y-13,4,4)
+        .fill({color:0xffe5a7,alpha:dusk*.80});
+    }
   }
 }
 /**
@@ -188,13 +302,63 @@ function renderCityEffects(g:Graphics,city:City,mood:CityMood,pulses:readonly Gr
   if(!motion)return;
   for(const pulse of pulses){
     const age=time-pulse.createdAt;
-    if(age<0||age>=3)continue;
+    if(age<0||age>=CONSTRUCTION_SECONDS)continue;
+    const t=age/CONSTRUCTION_SECONDS;
+    const phase=constructionStage(age);
     const pt=tilePosition(pulse.x,pulse.y);
-    const t=age/3,alpha=.8*(1-t);
-    const gold=pulse.kind==='upgrade'?0xffdb73:pulse.kind==='service'?0x77dbec:0x9ce4a1;
-    const radius=6+16*t;
-    g.circle(pt.x,pt.y-12,radius).stroke({width:2.5-1.4*t,color:gold,alpha});
-    g.circle(pt.x,pt.y-12,3+4*t).fill({color:gold,alpha:alpha*.42});
+    const color=pulse.kind==='upgrade'?0xffdf81:pulse.kind==='service'?0x83e4ee:0xa3e9ba;
+    if(pulse.kind==='service'){
+      const radius=5+22*t;
+      g.circle(pt.x,pt.y-10,radius).stroke({width:2.5,color,alpha:.7*(1-t)});
+      continue;
+    }
+    const building=city.buildings.find(b=>b.x===pulse.x&&b.y===pulse.y);
+    if(!building)continue;
+    // Stage 1 — groundwork: a visible excavation, stakes and site dust.
+    if(phase==='foundation'){
+      const reveal=Math.min(1,t/.22);
+      diamond(g,pt.x,pt.y,0xb28f64,.75);
+      g.poly([pt.x-15,pt.y+HH,pt.x,pt.y+HH-8,pt.x+15,pt.y+HH,pt.x,pt.y+HH+8])
+        .stroke({width:2.3,color:0xffd58c,alpha:.9});
+      for(const d of [-1,1]){
+        g.circle(pt.x+d*13,pt.y+HH+3-reveal*4,3+reveal*3)
+          .fill({color:0xded3b5,alpha:.36*(1-reveal*.5)});
+      }
+      continue;
+    }
+    // Stage 2 — the masonry rises from the foundation while a temporary
+    // scaffold and crane mark the building as under construction.
+    const rise=phase==='frame'?Math.max(.12,(t-.22)/.55):1;
+    drawCityBuilding(g,pt.x,pt.y,building,city.seed,'overview',rise);
+    if(phase==='frame'){
+      const h=getBuildingStyle(building,city.seed).height*rise;
+      const top=pt.y+7-h;
+      g.moveTo(pt.x-17,pt.y+HH+10).lineTo(pt.x-17,top)
+        .lineTo(pt.x+17,top).lineTo(pt.x+17,pt.y+HH+10)
+        .stroke({width:1.7,color:0xedbb67,alpha:.83});
+      for(let i=0;i<4;i++){
+        const yy=pt.y+HH+9-i*h/4;
+        g.moveTo(pt.x-17,yy).lineTo(pt.x+17,yy)
+          .stroke({width:1.1,color:0xffdea0,alpha:.72});
+      }
+      const sway=Math.sin(age*2)*4;
+      g.moveTo(pt.x+17,top-8).lineTo(pt.x-6,top-8)
+        .stroke({width:2,color:0xf8d183});
+      g.moveTo(pt.x-5,top-8).lineTo(pt.x-5+sway,top+7)
+        .stroke({width:1,color:0xb8a78d});
+      g.circle(pt.x+12,pt.y+HH+5,4).fill({color:0xe7d1a3,alpha:.33});
+    } else {
+      // Stage 3 — finish details and a short one-off completion sparkle.
+      drawCityBuilding(g,pt.x,pt.y,building,city.seed,'detail',1);
+      const fade=Math.max(0,(CONSTRUCTION_SECONDS-age)/(.23*CONSTRUCTION_SECONDS));
+      const sparkleY=pt.y-getBuildingStyle(building,city.seed).height-6;
+      for(let i=0;i<4;i++){
+        const angle=i*Math.PI/2+t*2;
+        const x=pt.x+Math.cos(angle)*(10+(1-fade)*12);
+        const y=sparkleY+Math.sin(angle)*(7+(1-fade)*8);
+        g.circle(x,y,2.4).fill({color,alpha:fade*.95});
+      }
+    }
   }
 }
 function renderTrafficHeatmap(g:Graphics, city:City){
@@ -267,11 +431,16 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     if(frameBudget<33)return;
     animationTime+=Math.min(0.075,frameBudget/1000);frameBudget=0;
     renderAmbient(ambient,scene,animationTime);
-    if(pulses.length){pulses=pulses.filter(p=>animationTime-p.createdAt<3);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);}
+    if(pulses.length){
+      const before=pulses.length;
+      pulses=pulses.filter(p=>animationTime-p.createdAt<CONSTRUCTION_SECONDS);
+      if(pulses.length!==before)refreshVisibleStructures(true);
+      renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);
+    }
   };
   app.ticker.add(onAnimationFrame);
   let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
-  let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0;
+  let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0,structuresCached=false;
   const refreshVisibleStructures=(force=false)=>{
     const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
     const detail=structureDetailAtZoom(zoom);
@@ -281,14 +450,29 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     renderedWindow=paddedTileWindow(visible,8);
     renderedDetail=detail;
     renderedZoom=zoom;
+    const hidden=new Set(pulses.filter(p=>p.kind!=='service').map(p=>tileIndex(p.x,p.y)));
     const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
-      {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
+      {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},hidden);
     structureBuilds++;
+    // Buildings are immutable between player edits/month ticks. Rasterize the
+    // visible construction set once, then keep GPU draw cost constant between
+    // rebuilds. Never cache moving vehicles, people or construction scenes.
+    structures.visible=renderedTiles>0;
+    if(renderedTiles>0){
+      if(structuresCached)structures.updateCacheTexture();
+      else{
+        structures.cacheAsTexture({resolution:mobileCanvas?0.65:0.9,antialias:false});
+        structuresCached=true;
+      }
+    }
+    app.canvas.dataset.structureCached=String(structuresCached);
     app.canvas.dataset.structureTiles=String(renderedTiles);
     app.canvas.dataset.structureDetail=detail;
     app.canvas.dataset.structureBuilds=String(structureBuilds);
   };
-  const resetView=()=>{zoom=Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
+  // Phone play starts close enough to see houses, people and traffic.
+  // Players can pinch out for an overview at any time.
+  const resetView=()=>{zoom=mobileCanvas?0.78:Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();};
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
@@ -306,18 +490,49 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);
   resetView();
   let down:{pointer:number;originX:number;originY:number;panX:number;panY:number;action:'pan'|'paint';path:TilePoint[];moved:boolean}|null=null;
+  // Two fingers always navigate (pan + pinch), even if a paint tool is active.
+  // The second touch aborts the stroke rather than placing an accidental road.
+  const touches=new Map<number,{x:number;y:number}>();
+  let pinch:{distance:number;zoom:number;worldX:number;worldY:number}|null=null;
+  const touchPair=()=>{
+    const [a,b]=[...touches.values()];
+    if(!a||!b)return null;
+    return {x:(a.x+b.x)/2,y:(a.y+b.y)/2,distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))};
+  };
+
   const point=(e:PointerEvent)=>hitTile(app.canvas,e.clientX,e.clientY,panX,panY,zoom);
   const local=(e:PointerEvent|WheelEvent)=>{const r=app.canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
   const pointerDown=(e:PointerEvent)=>{
-    if(down)return;
     if(e.pointerType==='mouse'&&e.button!==0&&e.button!==1&&e.button!==2)return;
-    const position=local(e),hit=point(e);
+    const position=local(e);
+    if(e.pointerType==='touch'){
+      touches.set(e.pointerId,position);
+      if(app.canvas.setPointerCapture)app.canvas.setPointerCapture(e.pointerId);
+      const pair=touchPair();
+      if(pair){
+        down=null;hover=null;
+        pinch={distance:pair.distance,zoom,worldX:(pair.x-panX)/zoom,worldY:(pair.y-panY)/zoom};
+        updateOverlay();return;
+      }
+    }
+    if(down||pinch)return;
+    const hit=point(e);
     const action=e.button===1||e.button===2||mode==='pan'||!canDragPaint(tool)?'pan':'paint';
     down={pointer:e.pointerId,originX:position.x,originY:position.y,panX,panY,action,path:hit?[hit]:[],moved:false};
-    if(app.canvas.setPointerCapture)app.canvas.setPointerCapture(e.pointerId);
+    if(e.pointerType!=='touch'&&app.canvas.setPointerCapture)app.canvas.setPointerCapture(e.pointerId);
     updateOverlay();
   };
   const pointerMove=(e:PointerEvent)=>{
+    if(e.pointerType==='touch'&&touches.has(e.pointerId)){
+      touches.set(e.pointerId,local(e));
+      const pair=touchPair();
+      if(pinch&&pair){
+        zoom=Math.max(.3,Math.min(2.4,pinch.zoom*pair.distance/pinch.distance));
+        panX=pair.x-pinch.worldX*zoom;panY=pair.y-pinch.worldY*zoom;
+        updateCamera();return;
+      }
+    }
+    if(pinch)return;
     if(!down){if(e.pointerType==='mouse'||e.pointerType==='pen'){const next=point(e);if(next?.x!==hover?.x||next?.y!==hover?.y){hover=next;updateOverlay();}}return;}
     if(down.pointer!==e.pointerId)return;
     const p=local(e);if(Math.hypot(p.x-down.originX,p.y-down.originY)>5)down.moved=true;
@@ -329,6 +544,14 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     }
   };
   const finish=(e:PointerEvent,cancelled:boolean)=>{
+    if(e.pointerType==='touch'){
+      touches.delete(e.pointerId);
+      if(pinch){
+        pinch=null;down=null;hover=null;updateOverlay();
+        if(app.canvas.hasPointerCapture?.(e.pointerId))app.canvas.releasePointerCapture(e.pointerId);
+        return;
+      }
+    }
     if(!down||down.pointer!==e.pointerId)return;
     const gesture=down;down=null;
     if(!cancelled){
@@ -342,7 +565,12 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   };
   const pointerUp=(e:PointerEvent)=>finish(e,false);
   const pointerCancel=(e:PointerEvent)=>finish(e,true);
-  const lostCapture=(e:PointerEvent)=>{if(down?.pointer===e.pointerId){down=null;updateOverlay();}};
+  const lostCapture=(e:PointerEvent)=>{
+    touches.delete(e.pointerId);
+    if(pinch){pinch=null;down=null;}
+    if(down?.pointer===e.pointerId){down=null;}
+    updateOverlay();
+  };
   const leave=()=>{if(!down){hover=null;updateOverlay();}};
   const contextMenu=(e:MouseEvent)=>e.preventDefault();
   const wheel=(e:WheelEvent)=>{e.preventDefault();const p=local(e);zoomBy(e.deltaY<0?1.12:1/1.12,p.x,p.y);};
@@ -356,7 +584,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
-      const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects;
+      const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects||next.policy!==city.policy||next.month!==city.month;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
       city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
@@ -365,7 +593,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
-    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();pulses=[];}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
+    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       resizeObserver.disconnect();

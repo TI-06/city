@@ -4,6 +4,11 @@ on:
     branches: [main, 'rebuild/**']
   pull_request:
     branches: [main]
+# New commits supersede obsolete PR verification jobs to avoid parallel
+# 100-year soak simulations and heavyweight Chromium runs starving each other.
+concurrency:
+  group: cityscape-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   quality:
     runs-on: ubuntu-latest
