@@ -51,3 +51,16 @@ test('traffic dashboard and congestion heatmap are reachable on desktop and mobi
   await expect(page.getByText('平均通勤距離')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('mobility policy can be activated and restored after reload', async ({page}) => {
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'政策と行政'}).click();
+  await page.locator('.policy-option').filter({hasText:'公共交通重視'}).click();
+  await expect(page.locator('.policy-option.current')).toContainText('公共交通重視');
+  await page.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(page.getByText('手動保存完了')).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'政策と行政'}).click();
+  await expect(page.locator('.policy-option.current')).toContainText('公共交通重視');
+});
