@@ -47,7 +47,10 @@ describe('Phase 2 aggregate road connectivity and congestion', () => {
     expect(b.congestedRoads).toBeGreaterThan(0);
     expect(b.congestion).toBeGreaterThan(a.congestion);
     expect(b.productivity).toBeLessThan(a.productivity);
-    expect(getStats(high).happiness).toBeLessThan(getStats(low).happiness);
+    // Compare congestion relief with the SAME resident/job mix to avoid confounding unemployment.
+    const lighterTraffic={...high,policy:'mobility' as const};
+    expect(analyzeTraffic(lighterTraffic).congestion).toBeLessThan(b.congestion);
+    expect(getStats(high).happiness).toBeLessThan(getStats(lighterTraffic).happiness);
     const encoded = JSON.stringify(high);
     expect(encoded).not.toContain('roadVolume');
     expect(encoded).not.toContain('roadComponents');

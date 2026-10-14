@@ -10,7 +10,7 @@ export const ROAD_CAPACITY = 85;
 export const ARTERIAL_CAPACITY = 220;
 /** Baseline roads=1, arterial roads=2; absent roads have no capacity. */
 export function getRoadCapacity(roadType:number):number{return roadType===2?ARTERIAL_CAPACITY:roadType===1?ROAD_CAPACITY:0;}
-const MAX_DELAY = 8;
+const MAX_DELAY = 12;
 const CELL_COUNT = SIZE * SIZE;
 const LABOR_RATIO = 0.53;
 
@@ -166,7 +166,8 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
     if (load > capacity) congestedRoads++;
     worstRoadLoad = Math.max(worstRoadLoad, load);
     const saturation = load / capacity;
-    const delay = Math.min(MAX_DELAY, 1 + 0.15 * Math.pow(saturation, 4));
+    // A softer saturation curve preserves differentiation even for very busy roads.
+    const delay = Math.min(MAX_DELAY, 1 + 0.2 * Math.pow(saturation, 1.5));
     totalRoadLoad += load;
     weightedDelay += load * delay;
   }

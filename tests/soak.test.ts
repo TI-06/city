@@ -38,6 +38,8 @@ describe('100-year city simulation durability',()=>{
     const direct=advanceMonths(original,1200);
     observe('baseline_100y',direct,performance.now()-started);
     assertHealthySnapshot(direct);
+    // A standard unmanaged starter town must not silently become uninhabited.
+    expect(getStats(direct).population).toBeGreaterThan(0);
     expect(direct.history).toHaveLength(120);
     expect(direct.month).toBe(1200);
 
@@ -60,6 +62,7 @@ describe('100-year city simulation durability',()=>{
     const result=advanceMonths(city,1200);
     observe('mobility_100y',result,performance.now()-started);
     assertHealthySnapshot(result);
+    expect(getStats(result).population).toBeGreaterThan(0);
     expect(result.policy).toBe('mobility');
     expect(result.month).toBe(1200);
   },120_000);
@@ -76,4 +79,16 @@ describe('100-year city simulation durability',()=>{
     expect(getStats(result).population).toBeLessThan(initialPopulation);
     expect(result.month).toBe(360);
   },120_000);
+});
+
+
+describe('economic consistency under population loss',()=>{
+  it('does not mint business income from firms with zero workers',()=>{
+    const city=createCity('無人都市',975);
+    city.buildings=city.buildings.filter(b=>b.kind!==1);
+    const stats=getStats(city);
+    expect(stats.population).toBe(0);
+    expect(stats.employed).toBe(0);
+    expect(stats.income).toBe(0);
+  });
 });

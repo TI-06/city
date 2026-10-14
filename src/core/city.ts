@@ -75,15 +75,18 @@ export function getStats(city:City):Stats {
   const green=city.services.filter(s=>s.kind==='park').length;
   const vacancies=Math.max(0,jobs-employed);
   const access=Math.min(16,city.services.filter(s=>s.kind!=='park').length*5);
-  const pollution=Math.round(industry*.65*(city.policy==='eco'?0.6:1));
+  // Pollution affects happiness but never scales without bound solely from building count.
+  const pollution=Math.min(14,Math.round(industry*.24*(city.policy==='eco'?0.6:1)));
   const crowded=population>2000?Math.min(12,(population-2000)/200):0;
   const disconnectedPenalty=labor===0?0:Math.min(12,Math.round((labor-employed)/labor*12));
-  const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0)-Math.round(traffic.congestion*0.18)-disconnectedPenalty)));
+  const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0)-Math.round(traffic.congestion*0.11)-disconnectedPenalty)));
   const housing=assessHousing(city,employed,happiness,analyzeLand(city));
   const housingPenalty=Math.min(12,Math.max(0,Math.round((housing.rentBurden-60)*0.4)));
   const adjustedHappiness=Math.max(20,happiness-housingPenalty);
   const enterpriseFactor=city.policy==='growth'?1.22:city.policy==='eco'?0.9:1;
-  const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor*traffic.productivity);
+  const laborUtilization=jobs>0?Math.min(1,employed/jobs):0;
+  // No corporate revenue from empty factories with no reachable workforce.
+  const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor*traffic.productivity*laborUtilization);
   const transportProgram=city.policy==='mobility'?90+population*0.14:0;
   const expenses=Math.round((roads-arterialRoads)*0.85+arterialRoads*3.25+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85+transportProgram);
   return {population,jobs,employed,vacancies,happiness:adjustedHappiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,arterialRoads,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity,housingCapacity:housing.capacity,housingVacancies:housing.vacant,housingDemandGap:housing.demandGap,estimatedRent:housing.estimatedRent,rentBurden:housing.rentBurden,affordability:housing.affordability,expectedMigration:housing.monthlyMigrationEstimate};
@@ -205,19 +208,24 @@ export function advanceMonths(current:City,count=1):City{
       if(z && !occupied.has(i) && adjacent(city,x,y))candidates.push({x,y,kind:z});
     }
     const growth=Math.min(3,Math.max(0,Math.floor(stats.happiness/40)));
-    const landValues=candidates.length?analyzeLand(city).values:null;
-    for(let j=0;j<growth&&candidates.length;j++){
+    // Demand-aware construction: avoid a speculative flood of empty housing/factories.
+    const eligible=candidates.filter(c=>{
+      if(c.kind===1)return stats.housingCapacity===0 || stats.housingVacancies<=Math.max(24,Math.round(stats.population*0.18));
+      return stats.vacancies<=Math.max(35,Math.round(stats.population*.53*.30));
+    });
+    const landValues=eligible.length?analyzeLand(city).values:null;
+    for(let j=0;j<growth&&eligible.length;j++){
       if(stats.happiness<40 && stepRandom(city)>0.25)continue;
       // Each district type favors a different land-value range. Draw deterministically.
       let totalWeight=0;
-      for(const c of candidates)totalWeight+=developmentWeight(c.kind,landValues?.[idx(c.x,c.y)]??40);
+      for(const c of eligible)totalWeight+=developmentWeight(c.kind,landValues?.[idx(c.x,c.y)]??40);
       let threshold=stepRandom(city)*totalWeight;
-      let choice=candidates.length-1;
-      for(let k=0;k<candidates.length;k++){
-        threshold-=developmentWeight(candidates[k]!.kind,landValues?.[idx(candidates[k]!.x,candidates[k]!.y)]??40);
+      let choice=eligible.length-1;
+      for(let k=0;k<eligible.length;k++){
+        threshold-=developmentWeight(eligible[k]!.kind,landValues?.[idx(eligible[k]!.x,eligible[k]!.y)]??40);
         if(threshold<0){choice=k;break;}
       }
-      const [target]=candidates.splice(choice,1);
+      const [target]=eligible.splice(choice,1);
       if(target)city.buildings.push(createBuilding(city,target.x,target.y,target.kind,1));
     }
     // Gradual redevelopment is a meaningful long-term growth mechanism.
