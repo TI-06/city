@@ -32,6 +32,15 @@ export function getCityMoment(previous:City,next:City):CityMoment|null{
     return {key:`construction-${next.month}`,title:`${built.length}棟の建物が新築！`,
       detail:`${names.join('・')}${built.length>2?' など':''}が街に加わりました。`,kind:'construction'};
   }
+  const priorSites=new Set((previous.construction??[]).map(site=>`${site.id}:${site.startMonth}`));
+  const launched=(next.construction??[]).filter(site=>!priorSites.has(`${site.id}:${site.startMonth}`));
+  if(launched.length){
+    const first=launched[0]!;
+    const target={id:first.id,x:first.x,y:first.y,kind:first.kind,level:first.level,residents:0,jobs:0};
+    const name=getBuildingStyle(target,next.seed).label;
+    return {key:`groundbreaking-${next.month}-${first.id}`,title:`${name}の工事が始まりました！`,
+      detail:`${launched.length}件着工。完成まで${first.duration}か月、建設現場の変化を確認しましょう。`,kind:'construction'};
+  }
   return null;
 }
 export function buildingStyleLabel(city:City,x:number,y:number):string|null{

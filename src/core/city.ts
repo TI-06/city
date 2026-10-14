@@ -6,6 +6,7 @@ import { infrastructureBudget, type MaintenancePlan } from './lifecycle';
 import { capitalLevel,capitalNextCost,capitalOperatingCost,CAPITAL_LABELS,validateCapitalProjects,type CapitalKind,type CapitalProjects } from './capital';
 import { debtBudget,austeritySavings,fiscalMode,validFiscalState,BOND_AMOUNT,BOND_TERM,type FiscalMode } from './fiscal';
 import { SIZE } from './grid';
+import {constructionDuration,finishConstruction,siteAt,describeConstruction,type ConstructionSite} from './construction';
 export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
 export type Zone = 0 | 1 | 2 | 3;
@@ -23,6 +24,8 @@ export type City = {
   capitalProjects?: CapitalProjects;
   /** Optional aggregate debt and consolidation measures for old schema-1 cities. */
   fiscalMode?: FiscalMode; debt?: number; debtPrincipalMonthly?: number;
+  /** Schema-1 optional: unfinished new buildings and staged level upgrades. */
+  construction?: ConstructionSite[];
 };
 export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; arterialRoads: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number; housingCapacity: number; housingVacancies: number; housingDemandGap: number; estimatedRent: number; rentBurden: number; affordability: number; expectedMigration: number; renewalDue: number; renewalSpending: number; maintenanceBacklog: number; projectedMaintenanceBacklog: number; infrastructureCondition: number; matureCityServices: number; maintenancePlan: MaintenancePlan; capitalOperating: number; netRent: number; fiscalMode: FiscalMode; publicSavings:number; outstandingDebt:number; debtLimit:number; debtHeadroom:number; debtInterest:number; debtPrincipal:number; operatingBalance:number; debtService:number };
 
@@ -51,7 +54,7 @@ export function createCity(name = 'みどり野市', seed = 12937): City {
     return Math.abs(x-river)<=1 || lake ? 0 : 1;
   });
   const city: City = {schema:1, name,seed,random:seeded(seed)||1,month:0,funds:38000,tax:9,policy:'balanced',land,
-    roads:Array(SIZE*SIZE).fill(0), zones:Array(SIZE*SIZE).fill(0),buildings:[],services:[],nextId:1,history:[],paused:true,speed:1,maintenancePlan:'standard',maintenanceBacklog:0,capitalProjects:{transit:0,housing:0,culture:0},fiscalMode:'normal',debt:0,debtPrincipalMonthly:0};
+    roads:Array(SIZE*SIZE).fill(0), zones:Array(SIZE*SIZE).fill(0),buildings:[],construction:[],services:[],nextId:1,history:[],paused:true,speed:1,maintenancePlan:'standard',maintenanceBacklog:0,capitalProjects:{transit:0,housing:0,culture:0},fiscalMode:'normal',debt:0,debtPrincipalMonthly:0};
   for (let x=17;x<=41;x++) for(const y of [23,31,39]) city.roads[idx(x,y)]=1;
   for (let y=18;y<=44;y++) for(const x of [20,29,38]) city.roads[idx(x,y)]=1;
   for (let y=18;y<=44;y++) for(let x=17;x<=42;x++){
@@ -111,7 +114,7 @@ export function getStats(city:City):Stats {
 }
 export type DevelopmentCounts = {home:number;shop:number;industry:number};
 export type DevelopmentOutlook = {
-  pending:DevelopmentCounts; ready:DevelopmentCounts; disconnected:number;
+  pending:DevelopmentCounts; ready:DevelopmentCounts; disconnected:number; inProgress:number;
   pausedByHappiness:boolean;
 };
 function canDevelopKind(kind:Exclude<Zone,0>,stats:Stats):boolean{
@@ -126,6 +129,7 @@ export function getDevelopmentOutlook(city:City,stats:Stats=getStats(city)):Deve
   const pending:DevelopmentCounts={home:0,shop:0,industry:0};
   const ready:DevelopmentCounts={home:0,shop:0,industry:0};
   const occupied=new Set(city.buildings.map(b=>idx(b.x,b.y)));
+  for(const site of city.construction??[])occupied.add(idx(site.x,site.y));
   let disconnected=0;
   for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
     const i=idx(x,y),kind=city.zones[i];
@@ -135,19 +139,19 @@ export function getDevelopmentOutlook(city:City,stats:Stats=getStats(city)):Deve
     pending[key]++;
     if(canDevelopKind(kind as Exclude<Zone,0>,stats))ready[key]++;
   }
-  return {pending,ready,disconnected,pausedByHappiness:stats.happiness<40};
+  return {pending,ready,disconnected,inProgress:city.construction?.length??0,pausedByHappiness:stats.happiness<40};
 }
 const historyEntry=(city:City):History=>{const s=getStats(city);return {month:city.month,population:s.population,funds:city.funds,income:s.income,expense:s.expenses,happiness:s.happiness};};
 export type CommandResult = {ok:true;changed:boolean;message:string;city:City}|{ok:false;changed:false;message:string;city:City};
 /** Command is atomic: invalid operations never modify the input world. */
 export function applyTool(current: City,tool:Tool,x:number,y:number):CommandResult{
   if(!inside(x,y))return {ok:false,changed:false,message:'マップの範囲外です',city:current};
-  const i=idx(x,y), currentBuilding=buildingAt(current,x,y), currentService=serviceAt(current,x,y);
+  const i=idx(x,y), currentBuilding=buildingAt(current,x,y), currentService=serviceAt(current,x,y),currentSite=siteAt(current,x,y);
   if(tool==='inspect')return {ok:true,changed:false,message:describeTile(current,x,y),city:current};
   if(tool==='bulldoze'){
-    if(!current.roads[i]&&!current.zones[i]&&!currentBuilding&&!currentService)return {ok:false,changed:false,message:'撤去するものがありません',city:current};
+    if(!current.roads[i]&&!current.zones[i]&&!currentBuilding&&!currentService&&!currentSite)return {ok:false,changed:false,message:'撤去するものがありません',city:current};
     if(current.funds<COST.bulldoze)return {ok:false,changed:false,message:'撤去資金が足りません',city:current};
-    const city=structuredClone(current);city.funds-=COST.bulldoze;city.roads[i]=0;city.zones[i]=0;city.buildings=city.buildings.filter(b=>b.x!==x||b.y!==y);city.services=city.services.filter(s=>s.x!==x||s.y!==y);
+    const city=structuredClone(current);city.funds-=COST.bulldoze;city.roads[i]=0;city.zones[i]=0;city.buildings=city.buildings.filter(b=>b.x!==x||b.y!==y);city.services=city.services.filter(s=>s.x!==x||s.y!==y);city.construction=city.construction?.filter(s=>s.x!==x||s.y!==y);
     return {ok:true,changed:true,message:'撤去しました',city};
   }
   if(tool==='arterial'){
@@ -157,7 +161,7 @@ export function applyTool(current: City,tool:Tool,x:number,y:number):CommandResu
     return {ok:true,changed:true,message:'幹線道路に改良しました',city};
   }
   if(!landAt(current,x,y))return {ok:false,changed:false,message:'水域には建設できません',city:current};
-  if(current.roads[i]||current.zones[i]||currentBuilding||currentService)return {ok:false,changed:false,message:'すでに建物・地区・道路があります',city:current};
+  if(current.roads[i]||current.zones[i]||currentBuilding||currentService||currentSite)return {ok:false,changed:false,message:'すでに建物・地区・道路があります',city:current};
   if(tool!=='road'&&!adjacent(current,x,y))return {ok:false,changed:false,message:'道路に接する土地を選択してください',city:current};
   if(current.funds<COST[tool])return {ok:false,changed:false,message:'資金が足りません',city:current};
   const city=structuredClone(current);city.funds-=COST[tool];
@@ -188,7 +192,7 @@ export function applyStroke(current: City, tool: Tool, points: readonly Readonly
     if (visited.has(key)) continue;
     visited.add(key);
     const i=idx(x,y);
-    const exists=Boolean(next.roads[i]||next.zones[i]||buildingAt(next,x,y)||serviceAt(next,x,y));
+    const exists=Boolean(next.roads[i]||next.zones[i]||buildingAt(next,x,y)||serviceAt(next,x,y)||siteAt(next,x,y));
     if (tool==='bulldoze') {
       if (!exists) {skipped++;lastReason='撤去するものがありません';continue;}
       if (next.funds<COST.bulldoze) {skipped++;lastReason='撤去資金が足りません';continue;}
@@ -196,6 +200,7 @@ export function applyStroke(current: City, tool: Tool, points: readonly Readonly
       next.roads[i]=0;next.zones[i]=0;
       next.buildings=next.buildings.filter(b=>b.x!==x||b.y!==y);
       next.services=next.services.filter(s=>s.x!==x||s.y!==y);
+      next.construction=next.construction?.filter(s=>s.x!==x||s.y!==y);
       applied++;
       continue;
     }
@@ -224,7 +229,7 @@ export function canPlaceAt(city:City,tool:Tool,x:number,y:number):boolean {
   if(!inside(x,y))return false;
   if(tool==='inspect')return true;
   const i=idx(x,y);
-  const occupied=Boolean(city.roads[i]||city.zones[i]||buildingAt(city,x,y)||serviceAt(city,x,y));
+  const occupied=Boolean(city.roads[i]||city.zones[i]||buildingAt(city,x,y)||serviceAt(city,x,y)||siteAt(city,x,y));
   if(tool==='bulldoze')return occupied&&city.funds>=COST.bulldoze;
   if(tool==='arterial')return city.roads[i]===1 && city.funds>=COST.arterial;
   if(!landAt(city,x,y)||occupied||city.funds<COST[tool])return false;
@@ -236,6 +241,7 @@ export function describeTile(city:City,x:number,y:number):string{
   if(city.land[idx(x,y)]===0)return '川・水域';
   if(city.roads[idx(x,y)]){const load=Math.round(analyzeTraffic(city).roadVolume[idx(x,y)]??0);const capacity=getRoadCapacity(city.roads[idx(x,y)]!);return `${city.roads[idx(x,y)]===2?'幹線道路':'一般道路'}：推定交通負荷 ${load} / 容量 ${capacity}${load>capacity?'（混雑）':''}`;}
   const s=serviceAt(city,x,y);if(s)return `${serviceNames[s.kind]}：運営中`;
+  const construction=siteAt(city,x,y);if(construction)return describeConstruction(construction,city.month);
   const b=buildingAt(city,x,y);if(b)return `${zoneNames[b.kind]}建物 Lv.${b.level} ／ 居住 ${b.residents}人 ／ 雇用 ${b.jobs}人`;
   return city.zones[idx(x,y)]?`${zoneNames[city.zones[idx(x,y)]!]}地区：開発待ち`:'空き地：開発できます';
 }
@@ -244,25 +250,27 @@ export function advanceMonths(current:City,count=1):City{
   const city=structuredClone(current);
   for(let n=0;n<count;n++){
     // Income is assessed from the preceding month's current population and jobs.
-    const stats=getStats(city);
-    city.funds+=stats.balance;
-    city.debt=Math.max(0,(city.debt??0)-stats.debtPrincipal);
+    const accounting=getStats(city);
+    city.funds+=accounting.balance;
+    city.debt=Math.max(0,(city.debt??0)-accounting.debtPrincipal);
     if(city.debt===0)city.debtPrincipalMonthly=0;
-    city.maintenanceBacklog=stats.projectedMaintenanceBacklog;
+    city.maintenanceBacklog=accounting.projectedMaintenanceBacklog;
     city.month++;
+    // Completion happens before evaluating new demand. Unfinished properties
+    // have no residents, available homes, jobs or corporate tax revenue.
+    finishConstruction(city);
+    const stats=getStats(city);
     const candidates: {x:number;y:number;kind:Exclude<Zone,0>}[]=[];
     const occupied=new Set(city.buildings.map(b=>idx(b.x,b.y)));
+    for(const site of city.construction??[])occupied.add(idx(site.x,site.y));
     for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
       const i=idx(x,y),z=city.zones[i] as Zone;
       if(z && !occupied.has(i) && adjacent(city,x,y))candidates.push({x,y,kind:z});
     }
     const growth=Math.min(3,Math.max(0,Math.floor(stats.happiness/40)));
-    // Demand-aware construction: avoid a speculative flood of empty housing/factories.
     const eligible=candidates.filter(c=>canDevelopKind(c.kind,stats));
     const landValues=eligible.length?analyzeLand(city).values:null;
     for(let j=0;j<growth&&eligible.length;j++){
-      if(stats.happiness<40 && stepRandom(city)>0.25)continue;
-      // Each district type favors a different land-value range. Draw deterministically.
       let totalWeight=0;
       for(const c of eligible)totalWeight+=developmentWeight(c.kind,landValues?.[idx(c.x,c.y)]??40);
       let threshold=stepRandom(city)*totalWeight;
@@ -272,12 +280,22 @@ export function advanceMonths(current:City,count=1):City{
         if(threshold<0){choice=k;break;}
       }
       const [target]=eligible.splice(choice,1);
-      if(target)city.buildings.push(createBuilding(city,target.x,target.y,target.kind,1));
+      if(target){
+        (city.construction??=[]).push({id:city.nextId++,x:target.x,y:target.y,kind:target.kind,
+          level:1,startMonth:city.month,duration:constructionDuration(target.kind,1)});
+      }
     }
-    // Gradual redevelopment is a meaningful long-term growth mechanism.
-    if(city.month%12===0 && city.buildings.length){
-      const b=city.buildings[Math.floor(stepRandom(city)*city.buildings.length)];
-      if(b && b.level<3 && stats.happiness>=60){ b.level++; if(b.kind!==1)b.jobs=b.kind===2?8+b.level*5:12+b.level*8; }
+    // Redevelopment is likewise a scheduled project, not an instant upgrade.
+    if(city.month%12===0 && city.buildings.length && stats.happiness>=60){
+      const eligibleBuildings=city.buildings.filter(b=>b.level<3
+        && !(city.construction??[]).some(site=>site.id===b.id));
+      const b=eligibleBuildings[Math.floor(stepRandom(city)*eligibleBuildings.length)];
+      if(b){
+        const nextLevel=b.level+1;
+        (city.construction??=[]).push({id:b.id,x:b.x,y:b.y,kind:b.kind,
+          level:nextLevel,upgradeFrom:b.level,startMonth:city.month,
+          duration:constructionDuration(b.kind,nextLevel,true)});
+      }
     }
     // New housing opens with vacant capacity. Existing households may move in or out.
     const updatedStats=getStats(city);
@@ -331,6 +349,29 @@ export function validateCity(candidate:unknown):City{
   if(!validateCapitalProjects(c.capitalProjects))throw new Error('公共投資の記録が無効です');
   if(!validFiscalState(c))throw new Error('財政・借入の記録が不正です');
   if(c.maintenanceBacklog!==undefined&&(!Number.isSafeInteger(c.maintenanceBacklog)||c.maintenanceBacklog<0||c.maintenanceBacklog>100_000_000))throw new Error('修繕残高が不正です');
+  if(c.construction!==undefined){
+    if(!Array.isArray(c.construction)||c.construction.length>SIZE*SIZE)throw new Error('工事記録が不正です');
+    const sites=new Set<number>(),siteIds=new Set<number>();
+    for(const work of c.construction){
+      if(!work||!inside(work.x,work.y)||!Number.isInteger(work.id)||work.id<1
+        ||![1,2,3].includes(work.kind)||!Number.isInteger(work.level)||work.level<1||work.level>3
+        ||!Number.isSafeInteger(work.startMonth)||work.startMonth<0||work.startMonth>c.month!
+        ||!Number.isInteger(work.duration)||work.duration<1||work.duration>24
+        ||work.startMonth+work.duration<=c.month!)throw new Error('工事記録が不正です');
+      const i=idx(work.x,work.y);
+      if(sites.has(i)||siteIds.has(work.id)||c.roads[i]||c.zones[i]!==work.kind
+        ||c.services.some(s=>s.x===work.x&&s.y===work.y))throw new Error('工事区画が重複しています');
+      sites.add(i);siteIds.add(work.id);
+      const existing=c.buildings.find(b=>b.x===work.x&&b.y===work.y);
+      if(work.upgradeFrom!==undefined){
+        if(!existing||existing.id!==work.id||existing.kind!==work.kind||
+          existing.level!==work.upgradeFrom||work.level!==work.upgradeFrom+1)
+          throw new Error('増築工事の記録が不正です');
+      }else if(existing||c.buildings.some(b=>b.id===work.id)){
+        throw new Error('新築工事の記録が重複しています');
+      }
+    }
+  }
   const occupied=new Set<number>(),ids=new Set<number>();
   for(const b of c.buildings){if(!inside(b.x,b.y)||!Number.isInteger(b.id)||!Number.isInteger(b.level)||b.level<1||b.level>3||![1,2,3].includes(b.kind)||!Number.isSafeInteger(b.residents)||!Number.isSafeInteger(b.jobs))throw new Error('建物情報が無効です');const i=idx(b.x,b.y);if(occupied.has(i)||ids.has(b.id))throw new Error('建物が重複しています');occupied.add(i);ids.add(b.id);}
   for(const s of c.services){if(!inside(s.x,s.y)||!['park','school','clinic'].includes(s.kind)||!Number.isInteger(s.id))throw new Error('公共施設情報が無効です');const i=idx(s.x,s.y);if(occupied.has(i)||ids.has(s.id))throw new Error('公共施設が重複しています');occupied.add(i);ids.add(s.id);}

@@ -19,7 +19,7 @@ test('mobile city uses a map-first game HUD and quick build dock',async ({page},
   await page.getByRole('button',{name:'建設メニューを閉じる'}).click();
   await expect(page.locator('.mobile-build-categories')).toBeHidden();
   await expect(page.locator('.map-host canvas')).toBeVisible();
-  await page.getByRole('button',{name:'建設メニューを開く'}).click();
+  await page.getByRole('button',{name:'建設メニューを開く',exact:true}).click();
   await expect(page.locator('.mobile-build-categories')).toBeVisible();
   await page.getByRole('button',{name:'都市データ管理'}).click();
   await expect(page.getByRole('dialog',{name:'都市データ管理'})).toBeVisible();

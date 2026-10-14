@@ -272,3 +272,51 @@
  .main-panel{height:100%;min-height:0;align-self:stretch}
  .map-host{flex:1 1 0%;min-height:0!important}
 }
+
+/* Phase 5-2: thumb-sized map commands, without scrolling past the city map. */
+.map-quick-menu{position:absolute;z-index:9;top:12px;left:12px;width:min(315px,calc(100% - 100px));font-size:12px;pointer-events:auto;color:#264839}
+.map-quick-trigger{display:flex;align-items:center;gap:9px;min-height:44px;padding:8px 12px;border-radius:12px;background:#1b5945;color:white;border:1px solid #71aa8d;box-shadow:0 7px 22px #122f2788;white-space:nowrap;touch-action:manipulation}
+.map-quick-trigger>span{font-size:23px;line-height:1}.map-quick-trigger strong{font-size:12px}.map-quick-trigger b{font-size:14px}
+.map-quick-menu.is-open .map-quick-trigger{border-radius:12px 12px 0 0;background:#215942}
+.map-quick-body{background:#f9fff5f5;border:1px solid #a8cab1;border-top:0;border-radius:0 12px 13px 13px;padding:9px;box-shadow:0 12px 30px #153b2b55;backdrop-filter:blur(10px)}
+.map-quick-categories{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.map-quick-categories button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:49px;padding:4px 2px;color:#517061;background:#e9f2e9;border:1px solid #d4e6d6;border-radius:9px;font-size:10px;font-weight:750;touch-action:manipulation}
+.map-quick-categories button span{font-size:17px}
+.map-quick-categories button.selected{background:#28795a;color:white;border-color:#28795a}
+.map-quick-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:8px}
+.map-quick-tools button{min-height:65px;padding:7px 3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#345e4c;background:white;border:1px solid #d9e9da;border-radius:10px;touch-action:manipulation}
+.map-quick-tools button span{font-size:24px;line-height:1}.map-quick-tools button strong{font-size:10px;white-space:nowrap}
+.map-quick-tools button.chosen{background:#dbf3e2;border-color:#278c5d;box-shadow:inset 0 0 0 1px #278c5d}
+.map-quick-footer{display:flex;align-items:center;gap:5px;border-top:1px solid #dce7dd;margin-top:8px;padding-top:8px}
+.map-quick-footer span{flex:1;font-size:10px;color:#54715f;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-quick-footer button{padding:8px 9px;border-radius:8px;background:#e2eee4;color:#315e4b;font-size:10px;font-weight:800;white-space:nowrap;touch-action:manipulation}
+.map-quick-footer button:disabled{opacity:.4}
+.map-quick-footer .map-quick-step{background:#276f51;color:white}
+.construction-summary{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:9px;color:#4e806a;padding:10px 11px;border-radius:9px;background:#e9f6ed}
+.construction-summary strong{font-size:11px}.construction-summary span{font-size:11px}
+@media(max-width:700px){
+ .map-quick-menu{top:auto;bottom:calc(116px + env(safe-area-inset-bottom));left:9px;width:min(310px,calc(100% - 90px));z-index:10}
+ .map-quick-trigger{min-height:46px;max-width:190px;padding:8px 11px}
+ .map-quick-body{max-height:min(290px,54dvh);overflow-y:auto}
+ .map-quick-tools button{min-height:58px}
+ .map-quick-menu.is-open{bottom:calc(116px + env(safe-area-inset-bottom))}
+ .map-quick-menu .map-quick-trigger{box-shadow:0 6px 22px #123f2980}
+ .mobile-progress-chip{max-width:56%;font-size:10px}
+ .construction-summary{gap:4px}
+}
+@media(max-width:370px){
+ .map-quick-menu{width:min(280px,calc(100% - 75px))}
+ .map-quick-tools button{min-height:53px}
+ .map-quick-tools button strong{font-size:9px}
+}
+
+/* When the legacy phone dock is expanded, the floating map command trigger
+ * must stay ABOVE it; otherwise the fixed dock masks the button completely. */
+@media(max-width:700px){
+ .app-shell[data-tools-open="yes"] .map-quick-menu{
+   bottom:calc(258px + env(safe-area-inset-bottom));
+ }
+ .app-shell[data-tools-open="yes"] .map-quick-menu.is-open{
+   bottom:calc(258px + env(safe-area-inset-bottom));
+ }
+}

@@ -6,6 +6,7 @@ import { canPlaceAt, type City, type Building, type Tool, SIZE, tileIndex } from
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { analyzeLand } from '../core/land';
 import {getBuildingStyle} from './building-style';
+import {constructionPhase,constructionProgress,type ConstructionSite} from '../core/construction';
 import { appendLine, canDragPaint, insideTile, type InteractionMode, type TilePoint } from '../core/paint';
 
 const HW = 26;
@@ -131,6 +132,55 @@ function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,de
     }
   }
 }
+/** A construction site stays on the map for entire game months.
+ * The silhouette and stage depend on the saved month, not frame animation.
+ */
+function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail,monthFraction=0){
+  const p=tilePosition(site.x,site.y),t=constructionProgress(site,city.month+monthFraction);
+  const phase=constructionPhase(site,city.month+monthFraction);
+  const target:Building={id:site.id,x:site.x,y:site.y,kind:site.kind,level:site.level,residents:0,jobs:0};
+  const old=site.upgradeFrom===undefined?0:getBuildingStyle({...target,level:site.upgradeFrom},city.seed).height;
+  const desired=getBuildingStyle(target,city.seed).height;
+  const heightRatio=Math.min(.98,Math.max(old/desired,(site.upgradeFrom?old/desired:.12)+t*(1-old/desired)));
+  diamond(g,p.x,p.y,0xc99e68,.62);
+  if(phase==='foundation'&&site.upgradeFrom===undefined){
+    g.poly([p.x-16,p.y+HH,p.x,p.y+HH-9,p.x+16,p.y+HH,p.x,p.y+HH+9])
+      .stroke({color:0xf9e1a6,width:2.7,alpha:.92});
+    g.moveTo(p.x-9,p.y+HH-2).lineTo(p.x+9,p.y+HH+2)
+      .stroke({color:0x8d654a,width:1.5});
+  }else{
+    drawCityBuilding(g,p.x,p.y,target,city.seed,detail,heightRatio);
+  }
+  // Site fence, crane and visible month-progress bar.
+  const top=p.y+10-Math.max(9,desired*heightRatio);
+  g.moveTo(p.x-20,p.y+HH+12).lineTo(p.x-20,top-5)
+    .lineTo(p.x+19,top-5).lineTo(p.x+19,p.y+HH+12)
+    .stroke({color:0xf5bc62,width:1.6,alpha:.9});
+  g.moveTo(p.x-20,p.y+HH+4).lineTo(p.x+19,p.y+HH+4)
+    .stroke({color:0xe1b477,width:1.4,alpha:.75});
+  g.moveTo(p.x+19,top-11).lineTo(p.x-7,top-11).stroke({color:0xfce1a3,width:2.4});
+  g.moveTo(p.x-4,top-11).lineTo(p.x-4,top+1).stroke({color:0xb59b75,width:1.1});
+  const barX=p.x-15,barY=p.y+HH*2+10;
+  g.roundRect(barX,barY,30,5,2).fill(0x284d42);
+  g.roundRect(barX,barY,Math.max(2,30*t),5,2).fill(0xffcc70);
+  if(detail==='detail'){
+    g.circle(p.x-16,p.y+HH+11,2).fill(0xe6dbb3);
+    g.circle(p.x+17,p.y+HH+11,2).fill(0xe6dbb3);
+  }
+}
+/** Construction is animated during the currently simulated month, and stops
+ * at the exact saved monthly state when paused or motion is disabled.
+ * Culling keeps worksite meshes bounded to what the player can see.
+ */
+function renderConstructionSites(g:Graphics,city:City,detail:StructureDetail,
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},fraction:number){
+  g.clear();
+  for(const site of city.construction??[]){
+    if(!tileNearViewport(site.x,site.y,viewport.width,viewport.height,
+      viewport.panX,viewport.panY,viewport.zoom,170))continue;
+    renderWorkSite(g,city,site,detail,fraction);
+  }
+}
 function renderTerrain(g:Graphics,city:City){
   g.clear();
   for(let sum=0;sum<2*SIZE-1;sum++)for(let y=Math.max(0,sum-SIZE+1);y<=Math.min(SIZE-1,sum);y++){
@@ -152,16 +202,17 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
   let renderedTiles=0;
   const buildings=new Map(city.buildings.map(b=>[tileIndex(b.x,b.y),b]));
   const services=new Map(city.services.map(s=>[tileIndex(s.x,s.y),s]));
+  const sites=new Set((city.construction??[]).map(site=>tileIndex(site.x,site.y)));
   for(let sum=window.minX+window.minY;sum<=window.maxX+window.maxY;sum++)
     for(let y=Math.max(window.minY,sum-window.maxX);y<=Math.min(window.maxY,sum-window.minX);y++){
     const x=sum-y,i=tileIndex(x,y);
     if(!tileNearViewport(x,y,viewport.width,viewport.height,viewport.panX,viewport.panY,viewport.zoom))continue;
     renderedTiles++;
     if(city.land[i]===0)continue;
-    const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i);
+    const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i),site=sites.has(i);
     if(city.zones[i]){
       diamond(g,p.x,p.y,COVERAGE[city.zones[i]!]!,0.42);
-      if(!b){
+      if(!b&&!site){
         // Vacant zoned land has a visible foundation even at overview zoom:
         // a zoned lot is NOT an already built home/shop/factory.
         g.poly([p.x-12,p.y+HH,p.x,p.y+HH-6,p.x+12,p.y+HH,p.x,p.y+HH+6])
@@ -186,7 +237,9 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
       if(city.roads[i]===2){g.circle(p.x-9,p.y+HH-4,2).fill(0xffe8a8);g.circle(p.x+9,p.y+HH+4,2).fill(0xffe8a8);}
       }
     }
-    if(b){
+    if(site){
+      // A small, separately updated graphics layer renders active work sites.
+    }else if(b){
       if(!constructionTiles.has(i))drawCityBuilding(g,p.x,p.y,b,city.seed,detail);
     } else if(s){
       if(s.kind==='park'){
@@ -303,60 +356,17 @@ function renderCityEffects(g:Graphics,city:City,mood:CityMood,pulses:readonly Gr
   for(const pulse of pulses){
     const age=time-pulse.createdAt;
     if(age<0||age>=CONSTRUCTION_SECONDS)continue;
-    const t=age/CONSTRUCTION_SECONDS;
-    const phase=constructionStage(age);
-    const pt=tilePosition(pulse.x,pulse.y);
-    const color=pulse.kind==='upgrade'?0xffdf81:pulse.kind==='service'?0x83e4ee:0xa3e9ba;
-    if(pulse.kind==='service'){
-      const radius=5+22*t;
-      g.circle(pt.x,pt.y-10,radius).stroke({width:2.5,color,alpha:.7*(1-t)});
-      continue;
-    }
-    const building=city.buildings.find(b=>b.x===pulse.x&&b.y===pulse.y);
-    if(!building)continue;
-    // Stage 1 — groundwork: a visible excavation, stakes and site dust.
-    if(phase==='foundation'){
-      const reveal=Math.min(1,t/.22);
-      diamond(g,pt.x,pt.y,0xb28f64,.75);
-      g.poly([pt.x-15,pt.y+HH,pt.x,pt.y+HH-8,pt.x+15,pt.y+HH,pt.x,pt.y+HH+8])
-        .stroke({width:2.3,color:0xffd58c,alpha:.9});
-      for(const d of [-1,1]){
-        g.circle(pt.x+d*13,pt.y+HH+3-reveal*4,3+reveal*3)
-          .fill({color:0xded3b5,alpha:.36*(1-reveal*.5)});
-      }
-      continue;
-    }
-    // Stage 2 — the masonry rises from the foundation while a temporary
-    // scaffold and crane mark the building as under construction.
-    const rise=phase==='frame'?Math.max(.12,(t-.22)/.55):1;
-    drawCityBuilding(g,pt.x,pt.y,building,city.seed,'overview',rise);
-    if(phase==='frame'){
-      const h=getBuildingStyle(building,city.seed).height*rise;
-      const top=pt.y+7-h;
-      g.moveTo(pt.x-17,pt.y+HH+10).lineTo(pt.x-17,top)
-        .lineTo(pt.x+17,top).lineTo(pt.x+17,pt.y+HH+10)
-        .stroke({width:1.7,color:0xedbb67,alpha:.83});
-      for(let i=0;i<4;i++){
-        const yy=pt.y+HH+9-i*h/4;
-        g.moveTo(pt.x-17,yy).lineTo(pt.x+17,yy)
-          .stroke({width:1.1,color:0xffdea0,alpha:.72});
-      }
-      const sway=Math.sin(age*2)*4;
-      g.moveTo(pt.x+17,top-8).lineTo(pt.x-6,top-8)
-        .stroke({width:2,color:0xf8d183});
-      g.moveTo(pt.x-5,top-8).lineTo(pt.x-5+sway,top+7)
-        .stroke({width:1,color:0xb8a78d});
-      g.circle(pt.x+12,pt.y+HH+5,4).fill({color:0xe7d1a3,alpha:.33});
-    } else {
-      // Stage 3 — finish details and a short one-off completion sparkle.
-      drawCityBuilding(g,pt.x,pt.y,building,city.seed,'detail',1);
-      const fade=Math.max(0,(CONSTRUCTION_SECONDS-age)/(.23*CONSTRUCTION_SECONDS));
-      const sparkleY=pt.y-getBuildingStyle(building,city.seed).height-6;
-      for(let i=0;i<4;i++){
-        const angle=i*Math.PI/2+t*2;
-        const x=pt.x+Math.cos(angle)*(10+(1-fade)*12);
-        const y=sparkleY+Math.sin(angle)*(7+(1-fade)*8);
-        g.circle(x,y,2.4).fill({color,alpha:fade*.95});
+    // New building construction already happened over real game months.
+    // This temporary ring celebrates COMPLETION, never rebuilds it.
+    const p=tilePosition(pulse.x,pulse.y),t=age/CONSTRUCTION_SECONDS;
+    const color=pulse.kind==='upgrade'?0xffe08d:pulse.kind==='service'?0x7de4de:0x91e9ae;
+    g.circle(p.x,p.y-20,8+t*19)
+      .stroke({color,width:2.5-t*1.5,alpha:.7*(1-t)});
+    if(t<.45){
+      for(let i=0;i<3;i++){
+        const angle=i*Math.PI*2/3+t*4;
+        g.circle(p.x+Math.cos(angle)*(10+t*12),p.y-25+Math.sin(angle)*(8+t*12),2.5)
+          .fill({color,alpha:1-t*2});
       }
     }
   }
@@ -419,17 +429,27 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   // Avoid 60 high-cost full-stage renders each second for a slowly moving city.
   app.ticker.maxFPS=30;
   const stage=new Container();
-  const terrain=new Graphics(),structures=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
-  stage.addChild(terrain,structures,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
+  const terrain=new Graphics(),structures=new Graphics(),worksites=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
+  stage.addChild(terrain,structures,worksites,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
   app.canvas.style.touchAction='none';
   let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false,landVisible=false;
   let scene=buildAmbientScene(initial),mood=visualMood(initial),pulses:GrowthPulse[]=[],motionEnabled=!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  let animationTime=0,frameBudget=0;
+  let animationTime=0,frameBudget=0,monthElapsed=0,siteDrawElapsed=0;
   const onAnimationFrame=(ticker:Ticker)=>{
     if(!motionEnabled||document.hidden)return;
     frameBudget+=Math.min(75,ticker.deltaMS);
     if(frameBudget<33)return;
-    animationTime+=Math.min(0.075,frameBudget/1000);frameBudget=0;
+    const elapsed=Math.min(0.075,frameBudget/1000);animationTime+=elapsed;frameBudget=0;
+    if(!city.paused){
+      monthElapsed=Math.min(20/Math.max(1,city.speed),monthElapsed+elapsed);
+    }
+    siteDrawElapsed+=elapsed;
+    if(siteDrawElapsed>.095 && city.construction?.length){
+      siteDrawElapsed=0;
+      const fraction=motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0;
+      renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),
+        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},fraction);
+    }
     renderAmbient(ambient,scene,animationTime);
     if(pulses.length){
       const before=pulses.length;
@@ -450,7 +470,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     renderedWindow=paddedTileWindow(visible,8);
     renderedDetail=detail;
     renderedZoom=zoom;
-    const hidden=new Set(pulses.filter(p=>p.kind!=='service').map(p=>tileIndex(p.x,p.y)));
+    const hidden=new Set<number>();
     const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},hidden);
     structureBuilds++;
@@ -473,7 +493,8 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   // Phone play starts close enough to see houses, people and traffic.
   // Players can pinch out for an overview at any time.
   const resetView=()=>{zoom=mobileCanvas?0.78:Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
-  const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();};
+  const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();
+    renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);};
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
     const next=Math.max(.3,Math.min(2.4,zoom*factor));
@@ -579,21 +600,24 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   app.canvas.addEventListener('lostpointercapture',lostCapture);app.canvas.addEventListener('pointerleave',leave);
   app.canvas.addEventListener('wheel',wheel,{passive:false});app.canvas.addEventListener('contextmenu',contextMenu);
   // Re-evaluate visible structures after container/layout/rotation changes.
-  const resizeObserver=new ResizeObserver(()=>refreshVisibleStructures(true));
+  const resizeObserver=new ResizeObserver(()=>{refreshVisibleStructures(true);
+    renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);});
   resizeObserver.observe(host);
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
-      const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
+      const monthChanged=next.month!==city.month;
+      const visualChanged=mapChanged||monthChanged||next.construction!==city.construction||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects||next.policy!==city.policy||next.month!==city.month;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
-      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
+      if(monthChanged)monthElapsed=0;
+      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
       if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
-    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
+    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       resizeObserver.disconnect();
