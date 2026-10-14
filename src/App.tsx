@@ -1,8 +1,9 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {analyzeLand} from './core/land';
 import {MAINTENANCE_LABELS,type MaintenancePlan} from './core/lifecycle';
+import {BOND_AMOUNT,type FiscalMode} from './core/fiscal';
 import {CAPITAL_LABELS,CAPITAL_NOTES,capitalLevel,capitalNextCost,type CapitalKind} from './core/capital';
-import {applyStroke,advanceMonths,changePolicy,changeTax,changeMaintenancePlan,fundCapitalProject,createCity,describeTile,getStats,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS,tileIndex} from './core/city';
+import {applyStroke,advanceMonths,changePolicy,changeTax,changeMaintenancePlan,fundCapitalProject,changeFiscalMode,issueMunicipalBond,createCity,describeTile,getStats,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS,tileIndex} from './core/city';
 import {mountMap,type MapController} from './game/map';
 import {canDragPaint,type InteractionMode,type TilePoint} from './core/paint';
 import {exportCity,importCity,loadCity,loadLatestCity,saveCity} from './persistence/storage';
@@ -109,6 +110,24 @@ export function App(){
       void saveCity(result.city).catch(()=>setSaveLabel('保存エラー'));
     }
   };
+  const setFiscalMode=(mode:FiscalMode)=>{
+    const next=changeFiscalMode(cityRef.current,mode);
+    if(next===cityRef.current)return;
+    editedRef.current=true;cityRef.current=next;setCity(next);
+    void saveCity(next).catch(()=>setSaveLabel('保存エラー'));
+    setMessage(mode==='austerity'?'行政の支出を抑えました。住民満足度に影響します':'行政サービスを通常水準に戻しました');
+  };
+  const borrow=()=>{
+    const current=cityRef.current;
+    if(!window.confirm('市債で25,000 Cを調達しますか？ 毎月の元金返済と利息が発生します。'))return;
+    const result=issueMunicipalBond(current);
+    setMessage(result.message);
+    if(result.changed){
+      editedRef.current=true;cityRef.current=result.city;setCity(result.city);
+      undoRef.current=null;setCanUndo(false);
+      void saveCity(result.city).catch(()=>setSaveLabel('保存エラー'));
+    }
+  };
   const setCurrentTool=(t:Tool)=>{setTool(t);setMode(canDragPaint(t)?'paint':'pan');setActive('build');setMessage(t==='inspect'?'調べたい建物や道路をクリックしてください':`${toolNames[t]}：土地をクリックして配置してください`);};
   const restoreBackup=async()=>{try{const saved=await loadCity('backup');if(!saved){setMessage('復元できるバックアップがありません');return;}if(!window.confirm('前回の自動保存から復元しますか？ 現在の未保存の変更は失われます。'))return;const next={...saved,paused:true};editedRef.current=true;cityRef.current=next;setCity(next);undoRef.current=null;setCanUndo(false);await saveCity(next);setMessage('バックアップから復元しました');}catch(e){setMessage(e instanceof Error?e.message:'バックアップを読み込めませんでした');}};
   const manualSave=()=>{void saveCity(cityRef.current,'manual').then(()=>{setSaveLabel('手動保存完了');setMessage('都市を保存しました');}).catch(()=>setMessage('保存に失敗しました'));};
@@ -122,7 +141,7 @@ export function App(){
       <nav aria-label="メインメニュー" className="menu">
         {([{id:'build',icon:'▦',name:'都市建設'},{id:'finance',icon:'▥',name:'財政と経済'},{id:'traffic',icon:'⇄',name:'交通・物流'},{id:'residents',icon:'♙',name:'住民と人口'},{id:'policy',icon:'⚑',name:'政策と行政'}] as const).map(item=><button key={item.id} className={`menu-link ${active===item.id?'active':''}`} onClick={()=>setActive(item.id)}><span className="menu-icon">{item.icon}</span>{item.name}{active===item.id&&<span className="menu-dot"/>}</button>)}
       </nav>
-      <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 3 · CAPITAL 0.5</div></div>
+      <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · FISCAL 0.6</div></div>
     </aside>
     <section className="workspace">
       <header className="topbar"><div className="breadcrumb">CITY OVERVIEW <span>/</span> <strong>{active==='build'?'都市建設':active==='finance'?'財政と経済':active==='traffic'?'交通・物流':active==='residents'?'住民と人口':'政策と行政'}</strong></div><div className="top-actions"><span className="autosave"><span className="save-dot"/>{saveLabel}</span><button className="top-button" onClick={manualSave}>保存</button><button className="top-button" onClick={()=>setHelp(true)} aria-label="ヘルプ">？</button></div></header>
@@ -170,7 +189,7 @@ export function App(){
             <div><small>更新の積み残し</small><b>{format(stats.maintenanceBacklog)} C</b></div>
             <div><small>施設の健全度</small><b>{stats.infrastructureCondition} / 100</b></div>
             <div><small>成熟都市の追加行政費</small><b>{format(stats.matureCityServices)} C / 月</b></div>
-            <div><small>公共投資の運営費</small><b>{format(stats.capitalOperating)} C / 月</b></div>
+            <div><small>公共投資の運営費</small><b>{format(stats.capitalOperating)} C / 月</b></div><div><small>市債の残高</small><b>{format(stats.outstandingDebt)} C</b></div><div><small>毎月の返済（元金＋利息）</small><b>{format(stats.debtService)} C</b></div>
             <div><small>就業者数</small><b>{format(stats.employed)} 人</b></div>
           </div>
           <div className="maintenance-panel">
@@ -203,6 +222,20 @@ export function App(){
             </div>
             <p className="finance-explainer">交通改善は通勤負荷を軽減、住宅支援は住民が支払う家賃を軽減、文化投資は満足度を底上げします。現段階では市全体に効く制度・投資であり、交通路線や個別施設の建設はまだありません。</p>
           </div>
+          <div className="fiscal-panel">
+            <div className="section-title"><strong>財政再建・市債</strong><span>資金繰りと行政サービスのバランス</span></div>
+            <div className="fiscal-status">
+              <strong>{stats.balance>=0&&city.funds>=0?'月次収支は黒字':stats.balance<0?'月次赤字に注意':'資金残高がマイナスです'}</strong>
+              <span>営業収支 {format(stats.operatingBalance)} C ／ 元金返済 {format(stats.debtPrincipal)} C ／ 現金増減 {format(stats.balance)} C</span>
+            </div>
+            <div className="fiscal-actions" role="group" aria-label="財政再建方針">
+              {([{id:'normal',name:'通常運営',hint:'行政サービスを維持'},
+                {id:'austerity',name:'支出抑制',hint:'維持費を削減するが住民満足度−7'}] as {id:FiscalMode;name:string;hint:string}[]).map(p=>
+                <button key={p.id} type="button" className={`fiscal-choice ${stats.fiscalMode===p.id?'current':''}`} aria-pressed={stats.fiscalMode===p.id} onClick={()=>setFiscalMode(p.id)}><b>{p.name}</b><small>{p.hint}</small></button>)}
+            </div>
+            <div className="fiscal-debt-row"><div><small>現在の借入</small><strong>{format(stats.outstandingDebt)} / {format(stats.debtLimit)} C</strong><small>今月の支出削減 {format(stats.publicSavings)} C</small></div><button type="button" className="fiscal-borrow" onClick={borrow} disabled={stats.debtHeadroom<BOND_AMOUNT} aria-label="市債を発行する">市債で25,000 C調達</button></div>
+            <p className="finance-explainer">借入は一時的な資金調達です。元金は約60回分の定額返済、未返済額には月0.3%の利息がかかります。返済を含めた現金増減は上の月間収支に反映済みです。赤字が続けば資金はマイナスになり、建設・投資ができなくなります。</p>
+          </div>
           <div className="control-row"><label htmlFor="tax">住民税率 <strong>{city.tax}%</strong></label><input id="tax" type="range" min="3" max="18" value={city.tax} onChange={e=>applyTax(Number(e.target.value))}/></div>
         </div>}
         {active==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div><div><small>住宅地の平均土地評価</small><b>{land.averageResidential}/100</b></div><div><small>高評価の土地</small><b>{format(land.desirableTiles)} マス</b></div><div><small>住宅の収容人数</small><b>{format(stats.housingCapacity)} 人</b></div><div><small>住宅の空き</small><b>{format(stats.housingVacancies)} 人分</b></div><div><small>推定家賃</small><b>{stats.estimatedRent.toFixed(1)} C / 人・月</b></div><div><small>支援後の家賃負担</small><b>{stats.netRent.toFixed(1)} C / 人・月</b></div><div><small>家賃負担率</small><b>{stats.rentBurden}%</b></div><div><small>住居負担のしやすさ</small><b>{stats.affordability} / 100</b></div><div><small>来月の推定人口移動</small><b className={stats.expectedMigration>=0?'positive':'negative'}>{stats.expectedMigration>0?'+':''}{format(stats.expectedMigration)} 人</b></div></div><div className="housing-advice" role="note">{stats.housingVacancies===0?'住宅が満室です。新たな住宅地区を指定すると入居できる場所が増えます。':stats.employed===0?'住宅の空きはありますが仕事が不足しています。商業・工業地区と道路を整備しましょう。':stats.rentBurden>65?'家賃負担が重い状態です。住宅を増やしたり、雇用・交通条件を改善しましょう。':'住宅の入居は空室、仕事、家賃負担、住民満足度で月ごとに変化します。'}</div></div>}
@@ -212,6 +245,6 @@ export function App(){
         <div className="inspector-foot"><button onClick={()=>exportCity(city)}>都市データを書き出す ↗</button><button onClick={()=>importRef.current?.click()}>データを読み込む ↥</button><button onClick={()=>{void restoreBackup();}}>前回のバックアップを復元 ↶</button><input ref={importRef} type="file" accept=".json,application/json" hidden onChange={e=>{void doImport(e.currentTarget.files?.[0]);e.currentTarget.value='';}}/><button className="new-game" onClick={()=>{if(window.confirm('現在の都市を新規作成しますか？ 自動保存は上書きされます。')){const next=createCity();editedRef.current=true;setCity(next);cityRef.current=next;setSelected(null);undoRef.current=null;setCanUndo(false);setMode('pan');setTool('inspect');void saveCity(next);setMessage('新しい都市を作りました');}}}>新しい都市を始める</button></div></aside>
       </div>
     </section>
-    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「住民と人口」では、学校・公園・産業施設などによる土地評価を地図で確認できます。</li><li>「財政と経済」でインフラ保全計画を選べます。維持費を削ると修繕の積み残しが増えます。</li><li>新しい住宅は空室として建設され、雇用・家賃・空室に応じて入居します。失業や生活費が高い場合は転出も起こります。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
+    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「住民と人口」では、学校・公園・産業施設などによる土地評価を地図で確認できます。</li><li>「財政と経済」でインフラ保全計画を選べます。維持費を削ると修繕の積み残しが増えます。</li><li>赤字対策には行政支出抑制か市債による資金調達がありますが、満足度低下や返済負担に注意してください。</li><li>新しい住宅は空室として建設され、雇用・家賃・空室に応じて入居します。失業や生活費が高い場合は転出も起こります。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
   </main>;
 }
