@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { advanceMonths, createCity, getStats, validateCity, type City } from '../src/core/city';
+import { advanceMonths, createCity, getStats, validateCity, fundCapitalProject, changeMaintenancePlan, type City } from '../src/core/city';
+import { capitalLevel, type CapitalKind } from '../src/core/capital';
 import { housingCapacity } from '../src/core/housing';
 
 function assertHealthySnapshot(city: City): void {
@@ -91,4 +92,53 @@ describe('economic consistency under population loss',()=>{
     expect(stats.employed).toBe(0);
     expect(stats.income).toBe(0);
   });
+});
+
+describe('Phase 3 capital projects and infrastructure pressure',()=>{
+  it('replays a fully invested 100-year city identically from a year-50 JSON save',()=>{
+    let city={...createCity('総合大型投資都市',1928),funds:2_000_000};
+    const spendingBefore=city.funds;
+    for(const kind of ['transit','housing','culture'] as CapitalKind[]){
+      for(let level=0;level<3;level++){
+        const result=fundCapitalProject(city,kind);
+        expect(result.changed).toBe(true);
+        city=result.city;
+      }
+    }
+    expect(city.funds).toBeLessThan(spendingBefore-1_000_000);
+    expect(capitalLevel(city,'transit')).toBe(3);
+    expect(capitalLevel(city,'housing')).toBe(3);
+    expect(capitalLevel(city,'culture')).toBe(3);
+    const now=getStats(city);
+    expect(now.capitalOperating).toBeGreaterThan(0);
+    expect(now.netRent).toBeLessThan(now.estimatedRent);
+
+    const started=performance.now();
+    const direct=advanceMonths(city,1200);
+    observe('all_capital_100y',direct,performance.now()-started);
+    assertHealthySnapshot(direct);
+    expect(direct.month).toBe(1200);
+    expect(direct.capitalProjects).toEqual(city.capitalProjects);
+    const saved=validateCity(JSON.parse(JSON.stringify(advanceMonths(city,600))));
+    const resumed=advanceMonths(saved,600);
+    expect(resumed).toEqual(direct);
+    expect(JSON.stringify(direct)).not.toContain('capitalHistory');
+  },120_000);
+
+  it('lets preventive maintenance reduce a real deferred backlog in a mature city',()=>{
+    const original=changeMaintenancePlan(createCity('財政方針検証',299),'minimum');
+    const neglected=advanceMonths(original,300);
+    const deferred=getStats(neglected);
+    expect(deferred.maintenanceBacklog).toBeGreaterThan(0);
+    expect(deferred.infrastructureCondition).toBeLessThan(100);
+
+    const switched=changeMaintenancePlan(neglected,'preventive');
+    const restored=advanceMonths(switched,300);
+    observe('maintenance_recovery_50y',restored,0);
+    assertHealthySnapshot(restored);
+    expect(restored.maintenanceBacklog).toBeLessThan(neglected.maintenanceBacklog!);
+    expect(getStats(restored).infrastructureCondition).toBeGreaterThan(deferred.infrastructureCondition);
+    const resume=advanceMonths(validateCity(JSON.parse(JSON.stringify(advanceMonths(switched,150)))),150);
+    expect(resume).toEqual(restored);
+  },120_000);
 });
