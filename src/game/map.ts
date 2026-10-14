@@ -177,7 +177,7 @@ function renderConstructionSites(g:Graphics,city:City,detail:StructureDetail,
   g.clear();
   for(const site of city.construction??[]){
     if(!tileNearViewport(site.x,site.y,viewport.width,viewport.height,
-      viewport.panX,viewport.panY,viewport.zoom,170))continue;
+      viewport.panX,viewport.panY,viewport.zoom,260))continue;
     renderWorkSite(g,city,site,detail,fraction);
   }
 }
@@ -501,11 +501,27 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     app.canvas.dataset.structureDetail=detail;
     app.canvas.dataset.structureBuilds=String(structureBuilds);
   };
+  const refreshSites=(force=false)=>{
+    if(!city.construction?.length){
+      if(force){worksites.clear();siteWindow=null;siteDetail=null;}
+      return;
+    }
+    const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
+    const detail=structureDetailAtZoom(zoom);
+    if(!force&&siteDetail===detail&&!needsTileWindowRefresh(siteWindow,visible,1))return;
+    siteWindow=paddedTileWindow(visible,4);siteDetail=detail;
+    renderConstructionSites(worksites,city,detail,
+      {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},
+      motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0);
+  };
   // Phone play starts close enough to see houses, people and traffic.
   // Players can pinch out for an overview at any time.
   const resetView=()=>{zoom=mobileCanvas?0.78:Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
-  const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();
-    renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);};
+  const updateCamera=()=>{
+    app.ticker.maxFPS=mobileCanvas?(zoom<.7?18:24):30;
+    stage.scale.set(zoom);stage.position.set(panX,panY);
+    refreshVisibleStructures();refreshSites();
+  };
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
     const next=Math.max(.3,Math.min(2.4,zoom*factor));
@@ -612,24 +628,24 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   app.canvas.addEventListener('lostpointercapture',lostCapture);app.canvas.addEventListener('pointerleave',leave);
   app.canvas.addEventListener('wheel',wheel,{passive:false});app.canvas.addEventListener('contextmenu',contextMenu);
   // Re-evaluate visible structures after container/layout/rotation changes.
-  const resizeObserver=new ResizeObserver(()=>{refreshVisibleStructures(true);
-    renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);});
+  const resizeObserver=new ResizeObserver(()=>{refreshVisibleStructures(true);refreshSites(true);});
   resizeObserver.observe(host);
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
-      const monthChanged=next.month!==city.month;
+      const monthChanged=next.month!==city.month,pausedChanged=next.paused!==city.paused;
       const visualChanged=mapChanged||monthChanged||next.construction!==city.construction||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects||next.policy!==city.policy||next.month!==city.month;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
       if(monthChanged)monthElapsed=0;
-      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
+      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);refreshSites(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
+      if(!visualChanged&&pausedChanged)refreshSites(true);
       if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime,{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
-    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime,{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
+    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime,{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}refreshSites(true);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       resizeObserver.disconnect();
