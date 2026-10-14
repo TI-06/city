@@ -1,6 +1,7 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
+import { analyzeLand } from '../core/land';
 import { appendLine, canDragPaint, insideTile, type InteractionMode, type TilePoint } from '../core/paint';
 
 const HW = 26;
@@ -123,6 +124,17 @@ function renderTrafficHeatmap(g:Graphics, city:City){
     if(ratio>=1.5)g.circle(p.x,p.y+HH,3).fill({color:0xffefdd,alpha:0.82});
   }
 }
+function renderLandHeatmap(g:Graphics,city:City){
+  g.clear();
+  const scores=analyzeLand(city).values;
+  for(let i=0;i<scores.length;i++){
+    if(city.land[i]===0)continue;
+    const score=scores[i]!;
+    const p=tilePosition(i%SIZE,Math.floor(i/SIZE));
+    const tint=score>=65?0x39b979:score>=45?0xaad46f:score>=25?0xe5bf66:0xd77a69;
+    diamond(g,p.x,p.y,tint,0.35);
+  }
+}
 function renderOverlay(g:Graphics,city:City,selection:TilePoint|null,hover:TilePoint|null,stroke:readonly TilePoint[],tool:Tool){
   g.clear();
   if(selection){const p=tilePosition(selection.x,selection.y);diamondStroke(g,p.x,p.y,0xfafdf6,2.2);}
@@ -142,6 +154,7 @@ export type MapController = {
   setSelected:(point:TilePoint|null,tool:Tool)=>void;
   setMode:(mode:InteractionMode)=>void;
   setTrafficView:(enabled:boolean)=>void;
+  setLandView:(enabled:boolean)=>void;
   resetView:()=>void;
   zoomBy:(factor:number)=>void;
   destroy:()=>void;
@@ -150,10 +163,10 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   const app=new Application();
   await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2)});
   const stage=new Container();
-  const terrain=new Graphics(),structures=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
-  stage.addChild(terrain,structures,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
+  const terrain=new Graphics(),structures=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
+  stage.addChild(terrain,structures,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
   app.canvas.style.touchAction='none';
-  let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false;
+  let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false,landVisible=false;
   let zoom=.85,panX=0,panY=0;
   const resetView=()=>{zoom=Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);};
@@ -212,10 +225,11 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
-      city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);}updateOverlay();},
+      city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
+    setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       app.canvas.removeEventListener('pointerdown',pointerDown);app.canvas.removeEventListener('pointermove',pointerMove);

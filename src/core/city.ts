@@ -1,5 +1,6 @@
 /** All game logic is deterministic and independent of the renderer and browser storage. */
 import { analyzeTraffic, getRoadCapacity } from './traffic';
+import { analyzeLand, developmentWeight } from './land';
 import { SIZE } from './grid';
 export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
@@ -200,9 +201,18 @@ export function advanceMonths(current:City,count=1):City{
       if(z && !occupied.has(i) && adjacent(city,x,y))candidates.push({x,y,kind:z});
     }
     const growth=Math.min(3,Math.max(0,Math.floor(stats.happiness/40)));
+    const landValues=candidates.length?analyzeLand(city).values:null;
     for(let j=0;j<growth&&candidates.length;j++){
       if(stats.happiness<40 && stepRandom(city)>0.25)continue;
-      const choice=Math.floor(stepRandom(city)*candidates.length);
+      // Each district type favors a different land-value range. Draw deterministically.
+      let totalWeight=0;
+      for(const c of candidates)totalWeight+=developmentWeight(c.kind,landValues?.[idx(c.x,c.y)]??40);
+      let threshold=stepRandom(city)*totalWeight;
+      let choice=candidates.length-1;
+      for(let k=0;k<candidates.length;k++){
+        threshold-=developmentWeight(candidates[k]!.kind,landValues?.[idx(candidates[k]!.x,candidates[k]!.y)]??40);
+        if(threshold<0){choice=k;break;}
+      }
       const [target]=candidates.splice(choice,1);
       if(target)city.buildings.push(createBuilding(city,target.x,target.y,target.kind,1));
     }

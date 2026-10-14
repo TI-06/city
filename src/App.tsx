@@ -1,5 +1,6 @@
-import {useCallback,useEffect,useRef,useState} from 'react';
-import {applyStroke,advanceMonths,changePolicy,changeTax,createCity,describeTile,getStats,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS} from './core/city';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {analyzeLand} from './core/land';
+import {applyStroke,advanceMonths,changePolicy,changeTax,createCity,describeTile,getStats,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS,tileIndex} from './core/city';
 import {mountMap,type MapController} from './game/map';
 import {canDragPaint,type InteractionMode,type TilePoint} from './core/paint';
 import {exportCity,importCity,loadCity,loadLatestCity,saveCity} from './persistence/storage';
@@ -45,6 +46,7 @@ export function App(){
   const mapHost=useRef<HTMLDivElement>(null);const mapRef=useRef<MapController|null>(null);
   const importRef=useRef<HTMLInputElement>(null);
   const stats=getStats(city);
+  const land=useMemo(()=>analyzeLand(city),[city]);
   const onTiles=useCallback((points:readonly TilePoint[])=>{
     const last=points[points.length-1];
     if(!last)return;
@@ -79,7 +81,7 @@ export function App(){
   useEffect(()=>{mapRef.current?.setCity(city);},[city]);
   useEffect(()=>{mapRef.current?.setSelected(selected,tool);},[selected,tool]);
   useEffect(()=>{mapRef.current?.setMode(mode);},[mode]);
-  useEffect(()=>{mapRef.current?.setTrafficView(active==='traffic');},[active,ready]);
+  useEffect(()=>{mapRef.current?.setTrafficView(active==='traffic');mapRef.current?.setLandView(active==='residents');},[active,ready]);
   useEffect(()=>{let cancelled=false;void loadLatestCity().then(result=>{if(result&&!cancelled&&!editedRef.current){const fresh={...result.city,paused:true};cityRef.current=fresh;setCity(fresh);undoRef.current=null;setCanUndo(false);setMessage(result.recoveredFromBackup?'保存内容に問題があったため、バックアップから都市を復元しました':'前回の都市を復元しました');}}).catch(e=>{if(!cancelled){setSaveLabel('復元できません');setMessage(e instanceof Error?e.message:'保存データを復元できませんでした');}});return()=>{cancelled=true;};},[]);
   useEffect(()=>{
     if(city.paused)return;
@@ -96,6 +98,7 @@ export function App(){
   const manualSave=()=>{void saveCity(cityRef.current,'manual').then(()=>{setSaveLabel('手動保存完了');setMessage('都市を保存しました');}).catch(()=>setMessage('保存に失敗しました'));};
   const doImport=async(f:File|undefined)=>{if(!f)return;try{const next=await importCity(f);next.paused=true;editedRef.current=true;cityRef.current=next;setCity(next);undoRef.current=null;setCanUndo(false);await saveCity(next);setMessage('都市のデータを読み込みました');}catch(e){setMessage(e instanceof Error?e.message:'読込エラー');}};
   const selectedDescription=selected?describeTile(city,selected.x,selected.y):'マップをクリックして土地を選択';
+  const selectedLandScore=selected?land.values[tileIndex(selected.x,selected.y)]:undefined;
   return <main className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brandmark">C<span>•</span></div><div><strong>CITYSCAPE</strong><small>街づくりと都市経営</small></div></div>
@@ -122,6 +125,7 @@ export function App(){
               <button aria-label="マップを中央に戻す" onClick={()=>mapRef.current?.resetView()}>⌂</button>
             </div>
           </div>
+          {active==='residents'&&<div className="land-legend" aria-label="土地評価の凡例"><strong>土地評価</strong><span><i className="land-low"/>低い</span><span><i className="land-mid"/>普通</span><span><i className="land-high"/>高い</span></div>}
           {active==='traffic'&&<div className="traffic-legend" aria-label="推定交通量の凡例"><strong>交通負荷</strong><span><i className="traffic-low"/>余裕</span><span><i className="traffic-medium"/>注意</span><span><i className="traffic-high"/>混雑</span></div>}
            <div className="map-hint">{mode==='paint'&&canDragPaint(tool)?`${toolNames[tool]}：ドラッグでまとめて配置 ／ 移動は「移動」ボタン`:'ドラッグで移動 ／ クリックして選択 ／ ホイールで拡大縮小'}</div>
         </div><div className="notice"><span>ⓘ</span><span role="status">{message}</span></div>
@@ -143,13 +147,13 @@ export function App(){
           <p className="traffic-note">一般道路の容量は85、幹線道路は220。幹線道路は1マス420 Cの改良費と追加維持費がかかります。交差点制御や迂回行動は未導入です。</p>
         </div>}
         {active==='finance'&&<div className="data-panel"><div className="panel-title"><strong>財政と経済</strong><span>都市の収入・支出を確認</span></div><div className="metric-grid"><div><small>税収・企業収入</small><b className="positive">+{format(stats.income)} C / 月</b></div><div><small>維持・公共サービス費</small><b className="negative">−{format(stats.expenses)} C / 月</b></div><div><small>就業者数</small><b>{format(stats.employed)} 人</b></div><div><small>商業 / 工業</small><b>{stats.commerce} / {stats.industry} 棟</b></div></div><div className="control-row"><label htmlFor="tax">住民税率 <strong>{city.tax}%</strong></label><input id="tax" type="range" min="3" max="18" value={city.tax} onChange={e=>applyTax(Number(e.target.value))}/></div></div>}
-        {active==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div></div></div>}
+        {active==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div><div><small>住宅地の平均土地評価</small><b>{land.averageResidential}/100</b></div><div><small>高評価の土地</small><b>{format(land.desirableTiles)} マス</b></div></div></div>}
         {active==='policy'&&<div className="data-panel"><div className="panel-title"><strong>市政方針</strong><span>都市の経営方針を選択</span></div><div className="policy-grid">{([{id:'balanced',desc:'住民と経済をバランスよく成長'},{id:'growth',desc:'税収増を狙うが環境に負荷'},{id:'eco',desc:'住環境を優先し産業利益は減少'},{id:'mobility',desc:'公共交通・時差通勤を補助し、混雑を軽減するが運営費が増加'}] as {id:Policy;desc:string}[]).map(p=><button key={p.id} className={`policy-option ${city.policy===p.id?'current':''}`} onClick={()=>applyPolicy(p.id)}><b>{POLICY_LABELS[p.id]}</b><small>{p.desc}</small></button>)}</div></div>}
         </div>
-        <aside className="inspector"><div className="inspector-header"><span className="inspector-label">CITY INSIGHTS</span><strong>都市の状況</strong></div><div className="inspector-body"><div className="info-highlight"><span className="tiny-label">選択中のエリア</span><strong>{selected?`区画 ${selected.x}, ${selected.y}`:'区画を選択'}</strong><p>{selectedDescription}</p></div><div className="inspector-section"><div className="section-title"><strong>都市の指標</strong><span>月次更新</span></div><div className="inspector-kpi"><span>住宅</span><b>{stats.homes}棟</b></div><div className="inspector-kpi"><span>商業</span><b>{stats.commerce}棟</b></div><div className="inspector-kpi"><span>工業</span><b>{stats.industry}棟</b></div><div className="inspector-kpi"><span>道路</span><b>{stats.roads}マス</b></div><div className="inspector-kpi"><span>推定混雑度</span><b>{stats.congestion}%</b></div><div className="inspector-kpi"><span>公園</span><b>{stats.green}か所</b></div></div><div className="inspector-section"><div className="section-title"><strong>都市の成長</strong><span>直近120か月</span></div><Sparkline numbers={city.history.map(x=>x.population)}/></div><div className="tips"><span>💡 市長へのヒント</span><p>道路の隣に住宅・商業・工業地区を指定すると、時間の経過で建物が建設されます。</p></div></div>
+        <aside className="inspector"><div className="inspector-header"><span className="inspector-label">CITY INSIGHTS</span><strong>都市の状況</strong></div><div className="inspector-body"><div className="info-highlight"><span className="tiny-label">選択中のエリア</span><strong>{selected?`区画 ${selected.x}, ${selected.y}`:'区画を選択'}</strong><p>{selectedDescription}</p>{selectedLandScore!==undefined&&selectedLandScore>0&&<p className="selected-land-value">土地評価：<strong>{selectedLandScore}/100</strong></p>}</div><div className="inspector-section"><div className="section-title"><strong>都市の指標</strong><span>月次更新</span></div><div className="inspector-kpi"><span>住宅</span><b>{stats.homes}棟</b></div><div className="inspector-kpi"><span>商業</span><b>{stats.commerce}棟</b></div><div className="inspector-kpi"><span>工業</span><b>{stats.industry}棟</b></div><div className="inspector-kpi"><span>道路</span><b>{stats.roads}マス</b></div><div className="inspector-kpi"><span>推定混雑度</span><b>{stats.congestion}%</b></div><div className="inspector-kpi"><span>公園</span><b>{stats.green}か所</b></div></div><div className="inspector-section"><div className="section-title"><strong>都市の成長</strong><span>直近120か月</span></div><Sparkline numbers={city.history.map(x=>x.population)}/></div><div className="tips"><span>💡 市長へのヒント</span><p>道路の隣に住宅・商業・工業地区を指定すると、時間の経過で建物が建設されます。</p></div></div>
         <div className="inspector-foot"><button onClick={()=>exportCity(city)}>都市データを書き出す ↗</button><button onClick={()=>importRef.current?.click()}>データを読み込む ↥</button><button onClick={()=>{void restoreBackup();}}>前回のバックアップを復元 ↶</button><input ref={importRef} type="file" accept=".json,application/json" hidden onChange={e=>{void doImport(e.currentTarget.files?.[0]);e.currentTarget.value='';}}/><button className="new-game" onClick={()=>{if(window.confirm('現在の都市を新規作成しますか？ 自動保存は上書きされます。')){const next=createCity();editedRef.current=true;setCity(next);cityRef.current=next;setSelected(null);undoRef.current=null;setCanUndo(false);setMode('pan');setTool('inspect');void saveCity(next);setMessage('新しい都市を作りました');}}}>新しい都市を始める</button></div></aside>
       </div>
     </section>
-    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
+    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「住民と人口」では、学校・公園・産業施設などによる土地評価を地図で確認できます。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
   </main>;
 }

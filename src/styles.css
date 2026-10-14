@@ -34,3 +34,10 @@
 
 /* Road-upgrade toolbar affordance */
 .tool-tile[aria-pressed="true"]:focus-visible,.tool-tile:focus-visible{outline:3px solid #51a4e3;outline-offset:2px}
+
+/* Phase 2-5 neighborhood desirability overlay */
+.land-legend{position:absolute;right:14px;top:64px;z-index:3;display:flex;align-items:center;gap:10px;background:#193843e8;color:#effaf5;padding:9px 11px;border-radius:9px;font-size:10px;pointer-events:none;box-shadow:0 6px 18px #091c2440}
+.land-legend strong{font-size:10px;margin-right:2px}.land-legend span{display:flex;align-items:center;gap:4px}.land-legend i{display:inline-block;width:10px;height:10px;border-radius:3px}
+.land-low{background:#d77a69}.land-mid{background:#e5bf66}.land-high{background:#39b979}
+.selected-land-value{margin-top:6px!important;color:#368968!important}.selected-land-value strong{color:#276246}
+@media(max-width:600px){.land-legend{top:62px;right:8px;gap:6px;padding:7px;font-size:9px}}
