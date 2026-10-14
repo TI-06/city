@@ -24,13 +24,13 @@ export function getCityMoment(previous:City,next:City):CityMoment|null{
     const title=oldStyle.label===newStyle.label?`${newStyle.label}が増築されました！`
       :`${oldStyle.label}が${newStyle.label}に成長！`;
     return {key:`redevelopment-${next.month}-${b.id}`,title,
-      detail:`区画 ${b.x}, ${b.y} の建物が Lv.${old.level} → Lv.${b.level} に発展しました。`,kind:'redevelopment'};
+      detail:`区画 ${b.x}, ${b.y} の建物が Lv.${old.level} → Lv.${b.level} に発展しました。`,kind:'redevelopment',point:{x:b.x,y:b.y}};
   }
   const built=next.buildings.filter(b=>!byId.has(b.id));
   if(built.length){
     const names=built.slice(0,2).map(b=>getBuildingStyle(b,next.seed).label);
     return {key:`construction-${next.month}`,title:`${built.length}棟の建物が新築！`,
-      detail:`${names.join('・')}${built.length>2?' など':''}が街に加わりました。`,kind:'construction'};
+      detail:`${names.join('・')}${built.length>2?' など':''}が街に加わりました。`,kind:'construction',point:{x:built[0]!.x,y:built[0]!.y}};
   }
   const priorSites=new Set((previous.construction??[]).map(site=>`${site.id}:${site.startMonth}`));
   const launched=(next.construction??[]).filter(site=>!priorSites.has(`${site.id}:${site.startMonth}`));
@@ -39,7 +39,7 @@ export function getCityMoment(previous:City,next:City):CityMoment|null{
     const target={id:first.id,x:first.x,y:first.y,kind:first.kind,level:first.level,residents:0,jobs:0};
     const name=getBuildingStyle(target,next.seed).label;
     return {key:`groundbreaking-${next.month}-${first.id}`,title:`${name}の工事が始まりました！`,
-      detail:`${launched.length}件着工。完成まで${first.duration}か月、建設現場の変化を確認しましょう。`,kind:'construction'};
+      detail:`${launched.length}件着工。完成まで${first.duration}か月、建設現場の変化を確認しましょう。`,kind:'construction',point:{x:first.x,y:first.y}};
   }
   return null;
 }
