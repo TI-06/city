@@ -6,6 +6,8 @@ import {CAPITAL_LABELS,CAPITAL_NOTES,capitalLevel,capitalNextCost,type CapitalKi
 import {applyStroke,advanceMonths,changePolicy,changeTax,changeMaintenancePlan,fundCapitalProject,changeFiscalMode,issueMunicipalBond,createCity,describeTile,getStats,getDevelopmentOutlook,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS,tileIndex} from './core/city';
 import {mountMap,type MapController} from './game/map';
 import {visualMood} from './game/visual-state';
+import {citySkyline} from './game/building-style';
+import {buildingStyleLabel,getCityMoment,type CityMoment} from './game/city-moments';
 import {canDragPaint,type InteractionMode,type TilePoint} from './core/paint';
 import {exportCity,importCity,loadCity,loadLatestCity,saveCity} from './persistence/storage';
 
@@ -62,12 +64,14 @@ export function App(){
   const [ready,setReady]=useState(false);
   const [motion,setMotion]=useState(()=>!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const [help,setHelp]=useState(false);
+  const [cityMoment,setCityMoment]=useState<CityMoment|null>(null);
   const mapHost=useRef<HTMLDivElement>(null);const mapRef=useRef<MapController|null>(null);
   const importRef=useRef<HTMLInputElement>(null);
   const stats=getStats(city);
   const visualStatus=visualMood(city);
   const visualLabel=visualStatus==='crisis'?'財政危機':visualStatus==='repairs'?'修繕の遅れ':visualStatus==='developing'?'都市発展中':'安定した街';
   const land=useMemo(()=>analyzeLand(city),[city]);
+  const skyline=citySkyline(city);
   const development=getDevelopmentOutlook(city,stats);
   const waiting=development.pending.home+development.pending.shop+development.pending.industry;
   const readyToBuild=development.ready.home+development.ready.shop+development.ready.industry;
@@ -127,6 +131,7 @@ export function App(){
       industry:erected.filter(b=>b.kind===3).length,
     };
     const populationDelta=getStats(next).population-getStats(previous).population;
+    setCityMoment(getCityMoment(previous,next));
     const detail=erected.length
       ?'新築 '+[counts.home&&`住宅${counts.home}棟`,counts.shop&&`商業${counts.shop}棟`,counts.industry&&`工業${counts.industry}棟`].filter(Boolean).join('・')
       :'新築なし（開発状況を確認してください）';
@@ -195,7 +200,8 @@ export function App(){
     if(menu==='build'){setMobileToolsOpen(true);setMode(canDragPaint(tool)?'paint':'pan');}
     else setMode('pan');
   };
-  const selectedDescription=selected?describeTile(city,selected.x,selected.y):'マップをクリックして土地を選択';
+  const selectedStyle=selected?buildingStyleLabel(city,selected.x,selected.y):null;
+  const selectedDescription=selected?`${selectedStyle?`${selectedStyle} ／ `:''}${describeTile(city,selected.x,selected.y)}`:'マップをクリックして土地を選択';
   const selectedLandScore=selected?land.values[tileIndex(selected.x,selected.y)]:undefined;
   return <main className="app-shell" data-active-menu={active} data-tools-open={mobileToolsOpen?'yes':'no'}>
     <aside className="sidebar">
@@ -231,6 +237,10 @@ export function App(){
               <button className="motion-toggle" aria-pressed={motion} aria-label={motion?'演出を停止':'演出を再開'} title="街のアニメーション" onClick={()=>setMotion(value=>!value)}>{motion?'✦':'◌'}</button>
             </div>
           </div>
+          {cityMoment&&<div key={cityMoment.key} className={`city-growth-moment moment-${cityMoment.kind}`} role="status">
+            <span className="city-growth-spark">✦</span><div><strong>{cityMoment.title}</strong><p>{cityMoment.detail}</p></div>
+            <button type="button" onClick={()=>setCityMoment(null)} aria-label="成長のお知らせを閉じる">✕</button>
+          </div>}
           {active==='build'&&<div className="mobile-progress-chip" role="status"><span>🏗 建築可能 {readyToBuild}区画</span><span>建築待ち {waiting}区画</span></div>}
           {selected&&tool==='inspect'&&<div className="mobile-tile-info" role="note"><div><strong>区画 {selected.x}, {selected.y}</strong><button aria-label="区画情報を閉じる" onClick={()=>setSelected(null)}>✕</button></div><p>{selectedDescription}</p></div>}
           {active==='residents'&&<div className="land-legend" aria-label="土地評価の凡例"><strong>土地評価</strong><span><i className="land-low"/>低い</span><span><i className="land-mid"/>普通</span><span><i className="land-high"/>高い</span></div>}
@@ -322,7 +332,7 @@ export function App(){
           </div>
           <div className="control-row"><label htmlFor="tax">住民税率 <strong>{city.tax}%</strong></label><input id="tax" type="range" min="3" max="18" value={city.tax} onChange={e=>applyTax(Number(e.target.value))}/></div>
         </div>}
-        {active==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div><div><small>住宅地の平均土地評価</small><b>{land.averageResidential}/100</b></div><div><small>高評価の土地</small><b>{format(land.desirableTiles)} マス</b></div><div><small>住宅の収容人数</small><b>{format(stats.housingCapacity)} 人</b></div><div><small>住宅の空き</small><b>{format(stats.housingVacancies)} 人分</b></div><div><small>推定家賃</small><b>{stats.estimatedRent.toFixed(1)} C / 人・月</b></div><div><small>支援後の家賃負担</small><b>{stats.netRent.toFixed(1)} C / 人・月</b></div><div><small>家賃負担率</small><b>{stats.rentBurden}%</b></div><div><small>住居負担のしやすさ</small><b>{stats.affordability} / 100</b></div><div><small>来月の推定人口移動</small><b className={stats.expectedMigration>=0?'positive':'negative'}>{stats.expectedMigration>0?'+':''}{format(stats.expectedMigration)} 人</b></div></div><div className="housing-advice" role="note">{stats.housingVacancies===0?'住宅が満室です。新たな住宅地区を指定すると入居できる場所が増えます。':stats.employed===0?'住宅の空きはありますが仕事が不足しています。商業・工業地区と道路を整備しましょう。':stats.rentBurden>65?'家賃負担が重い状態です。住宅を増やしたり、雇用・交通条件を改善しましょう。':'住宅の入居は空室、仕事、家賃負担、住民満足度で月ごとに変化します。'}</div></div>}
+        {active==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>戸建て・連棟住宅</small><b>{skyline.cottages} 棟</b></div><div><small>中低層マンション</small><b>{skyline.apartments} 棟</b></div><div><small>高層マンション</small><b>{skyline.towers} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div><div><small>住宅地の平均土地評価</small><b>{land.averageResidential}/100</b></div><div><small>高評価の土地</small><b>{format(land.desirableTiles)} マス</b></div><div><small>住宅の収容人数</small><b>{format(stats.housingCapacity)} 人</b></div><div><small>住宅の空き</small><b>{format(stats.housingVacancies)} 人分</b></div><div><small>推定家賃</small><b>{stats.estimatedRent.toFixed(1)} C / 人・月</b></div><div><small>支援後の家賃負担</small><b>{stats.netRent.toFixed(1)} C / 人・月</b></div><div><small>家賃負担率</small><b>{stats.rentBurden}%</b></div><div><small>住居負担のしやすさ</small><b>{stats.affordability} / 100</b></div><div><small>来月の推定人口移動</small><b className={stats.expectedMigration>=0?'positive':'negative'}>{stats.expectedMigration>0?'+':''}{format(stats.expectedMigration)} 人</b></div></div><div className="housing-advice" role="note">{stats.housingVacancies===0?'住宅が満室です。新たな住宅地区を指定すると入居できる場所が増えます。':stats.employed===0?'住宅の空きはありますが仕事が不足しています。商業・工業地区と道路を整備しましょう。':stats.rentBurden>65?'家賃負担が重い状態です。住宅を増やしたり、雇用・交通条件を改善しましょう。':'住宅の入居は空室、仕事、家賃負担、住民満足度で月ごとに変化します。'}</div></div>}
         {active==='policy'&&<div className="data-panel"><div className="panel-title"><strong>市政方針</strong><span>都市の経営方針を選択</span></div><div className="policy-grid">{([{id:'balanced',desc:'住民と経済をバランスよく成長'},{id:'growth',desc:'税収増を狙うが環境に負荷'},{id:'eco',desc:'住環境を優先し産業利益は減少'},{id:'mobility',desc:'公共交通・時差通勤を補助し、混雑を軽減するが運営費が増加'}] as {id:Policy;desc:string}[]).map(p=><button key={p.id} className={`policy-option ${city.policy===p.id?'current':''}`} onClick={()=>applyPolicy(p.id)}><b>{POLICY_LABELS[p.id]}</b><small>{p.desc}</small></button>)}</div></div>}
         </div>
         <aside className="inspector"><div className="inspector-header"><span className="inspector-label">CITY INSIGHTS</span><strong>都市の状況</strong></div><div className="inspector-body"><div className="info-highlight"><span className="tiny-label">選択中のエリア</span><strong>{selected?`区画 ${selected.x}, ${selected.y}`:'区画を選択'}</strong><p>{selectedDescription}</p>{selectedLandScore!==undefined&&selectedLandScore>0&&<p className="selected-land-value">土地評価：<strong>{selectedLandScore}/100</strong></p>}</div><div className="inspector-section"><div className="section-title"><strong>都市の指標</strong><span>月次更新</span></div><div className="inspector-kpi"><span>住宅</span><b>{stats.homes}棟</b></div><div className="inspector-kpi"><span>商業</span><b>{stats.commerce}棟</b></div><div className="inspector-kpi"><span>工業</span><b>{stats.industry}棟</b></div><div className="inspector-kpi"><span>道路</span><b>{stats.roads}マス</b></div><div className="inspector-kpi"><span>推定混雑度</span><b>{stats.congestion}%</b></div><div className="inspector-kpi"><span>公園</span><b>{stats.green}か所</b></div></div><div className="inspector-section"><div className="section-title"><strong>都市の成長</strong><span>直近120か月</span></div><Sparkline numbers={city.history.map(x=>x.population)}/></div><div className="tips"><span>💡 市長へのヒント</span><p>道路の隣に住宅・商業・工業地区を指定すると、時間の経過で建物が建設されます。</p></div></div>
