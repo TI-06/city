@@ -11,12 +11,13 @@ test('mobile city uses a map-first game HUD and quick build dock',async ({page},
   expect(map).not.toBeNull();
   expect(viewport).not.toBeNull();
   expect(map!.height).toBeGreaterThan(viewport!.height*.42);
+  await page.getByRole('button',{name:'建設メニューを開く',exact:true}).click();
   await expect(page.locator('.mobile-build-categories')).toBeVisible();
   await expect(page.locator('.tool-tile[data-category="zones"]:visible')).toHaveCount(3);
   await page.locator('.mobile-build-categories').getByRole('button',{name:/公共施設/}).click();
   await expect(page.locator('.tool-tile[data-category="services"]:visible')).toHaveCount(3);
   await expect(page.locator('.tool-tile[data-category="zones"]:visible')).toHaveCount(0);
-  await page.getByRole('button',{name:'建設メニューを閉じる'}).click();
+  await page.getByRole('button',{name:'建設メニューを閉じる',exact:true}).click();
   await expect(page.locator('.mobile-build-categories')).toBeHidden();
   await expect(page.locator('.map-host canvas')).toBeVisible();
   await page.getByRole('button',{name:'建設メニューを開く',exact:true}).click();
@@ -37,6 +38,7 @@ test('two-finger city pinch zoom changes camera without painting',async ({page},
   await page.goto('/');
   const canvas=page.locator('.map-host canvas');
   await expect(canvas).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'建設メニューを開く',exact:true}).click();
   await page.locator('.mobile-build-categories').getByRole('button',{name:/道路/}).click();
   await page.locator('.tool-tile[data-category="roads"]').first().click();
   const funds=await page.locator('.stat').nth(1).locator('strong').innerText();
