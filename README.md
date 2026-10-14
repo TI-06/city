@@ -1,6 +1,6 @@
 # CITYSCAPE — 都市運営シミュレーション
 
-街の見た目の成長と自治体経営を組み合わせたブラウザゲーム。旧Phaserプロトタイプは引き継がず、React + PixiJS v8で実装し直した Phase 1 の建設エディタです。
+街の見た目の成長と自治体経営を組み合わせたブラウザゲーム。旧Phaserプロトタイプは引き継がず、React + PixiJS v8で実装し直した Phase 2 の交通シミュレーションを含みます。
 
 ## 起動
 
@@ -80,3 +80,19 @@ npm run e2e
 ```
 
 PCとモバイルのChromiumで、マップ描画、建設操作切替、ズーム、政策変更、保存後のリロード、横方向の表示崩れを検証します。GitHub Actionsでも実施し、失敗時の証跡をArtifactsに保存します。
+
+## Phase 2: traffic and connected workplaces
+
+- Road tiles form deterministic 4-neighbor connected networks.
+- Buildings use the lowest-index adjacent road tile for access. Jobs in disconnected road components cannot employ residents of another component.
+- A multi-source shortest-road search calculates representative commuter routes to the nearest job-access tile. Workplace delivery demand adds local freight load.
+- Road traffic volume uses a nominal capacity of 85 weighted trips per road cell; congestion is a BPR-inspired gameplay approximation, not a literal traffic count or minutes.
+- Congestion reduces resident happiness and enterprise-derived revenue; unreachable employment reduces employed population.
+- The **交通・物流** tab visualizes road-load colors and reports congestion, average road-cell commute distance, network components, and affected households.
+- Traffic analysis is derived on demand and **never saved**. City save schema remains v1, so existing IndexedDB/JSON cities continue to load.
+
+### Quality
+
+`npm run verify` checks TypeScript, Vitest and Vite build. The GitHub Actions workflow also runs Playwright Chromium tests on desktop and mobile emulation. E2E checks the traffic tab, map legend, and core interactions.
+
+Deferred: dynamic lane capacity, intersections/signals, public transit, destination-choice capacity matching, dedicated freight origin-destination routes, and alternate-route congestion assignment.
