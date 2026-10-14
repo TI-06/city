@@ -55,7 +55,7 @@ export function App(){
   const toolRef=useRef<Tool>('inspect');toolRef.current=tool;
   const [active,setActive]=useState<Menu>('build');
   const [mobileBuildGroup,setMobileBuildGroup]=useState<BuildGroup>('zones');
-  const [mobileToolsOpen,setMobileToolsOpen]=useState(true);
+  const [mobileToolsOpen,setMobileToolsOpen]=useState(()=>!window.matchMedia('(max-width:700px)').matches);
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const [mapQuickOpen,setMapQuickOpen]=useState(false);
   const [mapQuickGroup,setMapQuickGroup]=useState<BuildGroup>('zones');
@@ -188,7 +188,18 @@ export function App(){
       void saveCity(result.city).catch(()=>setSaveLabel('保存エラー'));
     }
   };
-  const setCurrentTool=(t:Tool)=>{setMapQuickGroup(categoryOfTool(t));setMobileBuildGroup(categoryOfTool(t));setMobileToolsOpen(true);setTool(t);setMode(canDragPaint(t)?'paint':'pan');setActive('build');setMessage(t==='inspect'?'調べたい建物や道路をクリックしてください':`${toolNames[t]}：土地をクリックして配置してください`);};
+  const setCurrentTool=(t:Tool,source:'dock'|'map'='dock')=>{
+    setMapQuickGroup(categoryOfTool(t));setMobileBuildGroup(categoryOfTool(t));
+    if(source==='map'){
+      // Selecting a map tool returns immediately to the city; on phones the
+      // legacy dock stays collapsed to avoid covering half the viewport.
+      if(window.matchMedia('(max-width:700px)').matches){
+        setMobileToolsOpen(false);setMapQuickOpen(false);
+      }
+    }else{setMobileToolsOpen(true);}
+    setTool(t);setMode(canDragPaint(t)?'paint':'pan');setActive('build');
+    setMessage(t==='inspect'?'調べたい建物や道路をクリックしてください':`${toolNames[t]}：地図をタップ・ドラッグして配置してください`);
+  };
   const restoreBackup=async()=>{try{const saved=await loadCity('backup');if(!saved){setMessage('復元できるバックアップがありません');return;}if(!window.confirm('前回の自動保存から復元しますか？ 現在の未保存の変更は失われます。'))return;const next={...saved,paused:true};editedRef.current=true;cityRef.current=next;setCity(next);undoRef.current=null;setCanUndo(false);await saveCity(next);setMessage('バックアップから復元しました');}catch(e){setMessage(e instanceof Error?e.message:'バックアップを読み込めませんでした');}};
   const manualSave=()=>{void saveCity(cityRef.current,'manual').then(()=>{setSaveLabel('手動保存完了');setMessage('都市を保存しました');}).catch(()=>setMessage('保存に失敗しました'));};
   const doImport=async(f:File|undefined)=>{if(!f)return;try{const next=await importCity(f);next.paused=true;editedRef.current=true;cityRef.current=next;setCity(next);undoRef.current=null;setCanUndo(false);await saveCity(next);setMessage('都市のデータを読み込みました');}catch(e){setMessage(e instanceof Error?e.message:'読込エラー');}};
@@ -200,15 +211,18 @@ export function App(){
     void saveCity(next);setMessage('新しい都市を作りました');
   };
   const switchMenu=(menu:Menu)=>{
-    setMobileMenuOpen(false);
-    setActive(menu);
-    if(menu==='build'){setMobileToolsOpen(true);setMode(canDragPaint(tool)?'paint':'pan');}
+    setMobileMenuOpen(false);setMapQuickOpen(false);setActive(menu);
+    if(menu==='build'){setMode(canDragPaint(tool)?'paint':'pan');}
     else setMode('pan');
+  };
+  const openMapQuick=()=>{
+    if(!mapQuickOpen&&window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);
+    setMapQuickOpen(prev=>!prev);
   };
   const selectedStyle=selected?buildingStyleLabel(city,selected.x,selected.y):null;
   const selectedDescription=selected?`${selectedStyle?`${selectedStyle} ／ `:''}${describeTile(city,selected.x,selected.y)}`:'マップをクリックして土地を選択';
   const selectedLandScore=selected?land.values[tileIndex(selected.x,selected.y)]:undefined;
-  return <main className="app-shell" data-active-menu={active} data-tools-open={mobileToolsOpen?'yes':'no'}>
+  return <main className="app-shell" data-active-menu={active} data-tools-open={mobileToolsOpen?'yes':'no'} data-map-quick-open={mapQuickOpen?'yes':'no'}>
     <aside className="sidebar">
       <div className="brand"><div className="brandmark">C<span>•</span></div><div><strong>CITYSCAPE</strong><small>街づくりと都市経営</small></div></div>
       <div className="sidebar-section-label">CITY MANAGER</div>
@@ -243,8 +257,8 @@ export function App(){
             </div>
           </div>
           {active==='build'&&<div className={`map-quick-menu ${mapQuickOpen?'is-open':''}`} aria-label="地図上の建設メニュー">
-            <button type="button" className="map-quick-trigger" aria-label={mapQuickOpen?'地図の建設メニューを閉じる':'地図の建設メニューを開く'} aria-expanded={mapQuickOpen} onClick={()=>setMapQuickOpen(v=>!v)}>
-              <span>▦</span><strong>{mapQuickOpen?'建設メニューを閉じる':'地図で建設'}</strong><b>{mapQuickOpen?'⌄':'⌃'}</b>
+            <button type="button" className="map-quick-trigger" aria-label={mapQuickOpen?'地図の建設メニューを閉じる':'地図の建設メニューを開く'} aria-expanded={mapQuickOpen} onClick={openMapQuick}>
+              <span>▦</span><strong>{mapQuickOpen?'コマンドを選ぶ':tool==='inspect'?'地図で建設':`${toolNames[tool]} を配置中`}</strong><b>{mapQuickOpen?'⌄':'⌃'}</b>
             </button>
             {mapQuickOpen&&<div className="map-quick-body">
               <div className="map-quick-categories" role="group" aria-label="地図建設カテゴリ">
@@ -254,10 +268,10 @@ export function App(){
               <div className="map-quick-tools" role="group" aria-label="地図建設コマンド">
                 {palettes.filter(p=>categoryOfTool(p.tool)===mapQuickGroup).map(p=>
                   <button key={p.tool} type="button" aria-label={`地図で${toolNames[p.tool]}を選択`} title={p.hint} aria-pressed={tool===p.tool} className={tool===p.tool?'chosen':''}
-                    onClick={()=>setCurrentTool(p.tool)}><span>{p.icon}</span><strong>{toolNames[p.tool]}</strong></button>)}
+                    onClick={()=>setCurrentTool(p.tool,'map')}><span>{p.icon}</span><strong>{toolNames[p.tool]}</strong></button>)}
               </div>
               <div className="map-quick-footer"><span>{toolNames[tool]} · {mode==='paint'?'指で描く':'地図を移動'}</span>
-                <button type="button" onClick={()=>setMode(mode==='paint'?'pan':'paint')} disabled={!canDragPaint(tool)}>{mode==='paint'?'✥ 移動':'✎ 描く'}</button>
+                <button type="button" onClick={()=>setMode(mode==='paint'?'pan':'paint')} disabled={!canDragPaint(tool)}>{mode==='paint'?'✥ 移動':'✎ 描く'}</button><button type="button" className="map-quick-undo" onClick={undo} disabled={!canUndo} aria-label="直前の建設を元に戻す">↶ 戻す</button>
                 <button type="button" className="map-quick-step" onClick={()=>progressMonth(true)}>翌月へ ›</button>
               </div>
             </div>}
