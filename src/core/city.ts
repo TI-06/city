@@ -1,6 +1,7 @@
 /** All game logic is deterministic and independent of the renderer and browser storage. */
 import { analyzeTraffic, getRoadCapacity } from './traffic';
 import { analyzeLand, developmentWeight } from './land';
+import { assessHousing, applyHousingMigration, housingCapacity } from './housing';
 import { SIZE } from './grid';
 export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
@@ -15,7 +16,7 @@ export type City = {
   land: number[]; roads: number[]; zones: number[]; buildings: Building[]; services: Service[];
   nextId: number; history: History[]; paused: boolean; speed: 1 | 2 | 4;
 };
-export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; arterialRoads: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number };
+export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; arterialRoads: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number; housingCapacity: number; housingVacancies: number; housingDemandGap: number; estimatedRent: number; rentBurden: number; affordability: number; expectedMigration: number };
 
 const COST: Record<Tool, number> = { inspect: 0, road: 65, arterial: 420, home: 12, shop: 12, industry: 12, park: 750, school: 2900, clinic: 4200, bulldoze: 90 };
 export const COSTS = COST;
@@ -50,7 +51,7 @@ export function createCity(name = 'みどり野市', seed = 12937): City {
     const kind:Exclude<Zone,0> = x<33?1:x>38?3:2;
     city.zones[idx(x,y)]=kind;
     const rand=stepRandom(city);
-    if(rand<0.27){city.buildings.push(createBuilding(city,x,y,kind,1));}
+    if(rand<0.27){city.buildings.push(createBuilding(city,x,y,kind,1,true));}
   }
   for (const s of [{x:24,y:24,kind:'park' as const},{x:32,y:32,kind:'school' as const}]){
     city.zones[idx(s.x,s.y)]=0;city.buildings=city.buildings.filter(b=>b.x!==s.x||b.y!==s.y);city.services.push({id:city.nextId++,...s});
@@ -58,8 +59,8 @@ export function createCity(name = 'みどり野市', seed = 12937): City {
   city.history.push(historyEntry(city));
   return city;
 }
-function createBuilding(city:City,x:number,y:number,kind:Exclude<Zone,0>,level:number):Building{
-  return {id:city.nextId++,x,y,kind,level,residents:kind===1?(6+level*6):0,jobs:kind===2?(8+level*5):kind===3?(12+level*8):0};
+function createBuilding(city:City,x:number,y:number,kind:Exclude<Zone,0>,level:number,starterOccupied=false):Building{
+  return {id:city.nextId++,x,y,kind,level,residents:kind===1&&starterOccupied?housingCapacity(level):0,jobs:kind===2?(8+level*5):kind===3?(12+level*8):0};
 }
 export function getStats(city:City):Stats {
   const population=city.buildings.reduce((n,b)=>n+b.residents,0);
@@ -78,11 +79,14 @@ export function getStats(city:City):Stats {
   const crowded=population>2000?Math.min(12,(population-2000)/200):0;
   const disconnectedPenalty=labor===0?0:Math.min(12,Math.round((labor-employed)/labor*12));
   const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0)-Math.round(traffic.congestion*0.18)-disconnectedPenalty)));
+  const housing=assessHousing(city,employed,happiness,analyzeLand(city));
+  const housingPenalty=Math.min(12,Math.max(0,Math.round((housing.rentBurden-60)*0.4)));
+  const adjustedHappiness=Math.max(20,happiness-housingPenalty);
   const enterpriseFactor=city.policy==='growth'?1.22:city.policy==='eco'?0.9:1;
   const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor*traffic.productivity);
   const transportProgram=city.policy==='mobility'?90+population*0.14:0;
   const expenses=Math.round((roads-arterialRoads)*0.85+arterialRoads*3.25+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85+transportProgram);
-  return {population,jobs,employed,vacancies,happiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,arterialRoads,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity};
+  return {population,jobs,employed,vacancies,happiness:adjustedHappiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,arterialRoads,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity,housingCapacity:housing.capacity,housingVacancies:housing.vacant,housingDemandGap:housing.demandGap,estimatedRent:housing.estimatedRent,rentBurden:housing.rentBurden,affordability:housing.affordability,expectedMigration:housing.monthlyMigrationEstimate};
 }
 const historyEntry=(city:City):History=>{const s=getStats(city);return {month:city.month,population:s.population,funds:city.funds,income:s.income,expense:s.expenses,happiness:s.happiness};};
 export type CommandResult = {ok:true;changed:boolean;message:string;city:City}|{ok:false;changed:false;message:string;city:City};
@@ -219,8 +223,12 @@ export function advanceMonths(current:City,count=1):City{
     // Gradual redevelopment is a meaningful long-term growth mechanism.
     if(city.month%12===0 && city.buildings.length){
       const b=city.buildings[Math.floor(stepRandom(city)*city.buildings.length)];
-      if(b && b.level<3 && stats.happiness>=60){ b.level++; b.residents=b.kind===1?6+b.level*6:0;b.jobs=b.kind===2?8+b.level*5:b.kind===3?12+b.level*8:0; }
+      if(b && b.level<3 && stats.happiness>=60){ b.level++; if(b.kind!==1)b.jobs=b.kind===2?8+b.level*5:12+b.level*8; }
     }
+    // New housing opens with vacant capacity. Existing households may move in or out.
+    const updatedStats=getStats(city);
+    const currentLand=analyzeLand(city);
+    applyHousingMigration(city,assessHousing(city,updatedStats.employed,updatedStats.happiness,currentLand),currentLand);
     city.history.push(historyEntry(city));
     if(city.history.length>120)city.history.shift();
   }
