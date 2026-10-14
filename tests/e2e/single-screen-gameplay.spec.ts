@@ -27,7 +27,7 @@ test('city-building and mayor decisions stay in one playable map screen',async (
   await plans.getByRole('button').last().click();
   await expect(plans.getByRole('button').last()).toHaveAttribute('aria-pressed','true');
   await operations.getByRole('button',{name:'大型投資'}).click();
-  await expect(operations.getByRole('button',{name:'地図から交通改善事業へ投資'})).toBeVisible();
+  await expect(operations.getByRole('button',{name:'地図から交通ネットワーク強化へ投資'})).toBeVisible();
   await operations.getByRole('button',{name:'街の診断'}).click();
   await expect(operations.getByRole('button',{name:'交通量'})).toBeVisible();
   await operations.getByRole('button',{name:'交通量'}).click();
