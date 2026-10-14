@@ -57,6 +57,8 @@ export function App(){
   const [mobileBuildGroup,setMobileBuildGroup]=useState<BuildGroup>('zones');
   const [mobileToolsOpen,setMobileToolsOpen]=useState(true);
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
+  const [mapQuickOpen,setMapQuickOpen]=useState(false);
+  const [mapQuickGroup,setMapQuickGroup]=useState<BuildGroup>('zones');
   const [selected,setSelected]=useState<{x:number;y:number}|null>(null);
   const selectedRef=useRef<{x:number;y:number}|null>(null);selectedRef.current=selected;
   const [message,setMessage]=useState('道路を敷いたり、住宅地区を指定して街を育てましょう。');
@@ -74,9 +76,11 @@ export function App(){
   const skyline=citySkyline(city);
   const development=getDevelopmentOutlook(city,stats);
   const waiting=development.pending.home+development.pending.shop+development.pending.industry;
+  const activeSites=city.construction??[];
+  const nextCompletion=activeSites.length?Math.min(...activeSites.map(s=>s.startMonth+s.duration-city.month)):null;
   const readyToBuild=development.ready.home+development.ready.shop+development.ready.industry;
   const developmentHint=development.pausedByHappiness?'住民満足度が40未満のため、民間開発が止まっています。税率や公共サービスを見直しましょう。'
-    :waiting===0?(development.disconnected>0?'道路から切り離された開発地区があります。道路をつなぎ直してください。':'開発待ちの地区がありません。道路沿いの空き地に住宅・商業・工業地区を指定しましょう。')
+    :waiting===0?(activeSites.length>0?`工事中の建物が${activeSites.length}件あります。あと${nextCompletion}か月で次の建物が完成します。`:development.disconnected>0?'道路から切り離された開発地区があります。道路をつなぎ直してください。':'開発待ちの地区がありません。道路沿いの空き地に住宅・商業・工業地区を指定しましょう。')
     :readyToBuild===0?[
       development.pending.home>0&&development.ready.home===0?'住宅：空室が多いため新築を見合わせています。先に入居と雇用を増やしましょう。':null,
       development.pending.shop+development.pending.industry>0&&development.ready.shop+development.ready.industry===0?'商業・工業：求人の空きが多く、新規建築を見合わせています。住宅や人口を増やしましょう。':null,
@@ -124,6 +128,9 @@ export function App(){
     const previous=cityRef.current;
     const next=advanceMonths(previous,1);
     const oldBuildings=new Set(previous.buildings.map(b=>b.id));
+    const previousSites=new Set((previous.construction??[]).map(site=>`${site.id}:${site.startMonth}`));
+    const started=(next.construction??[]).filter(site=>!previousSites.has(`${site.id}:${site.startMonth}`));
+    const completed=(previous.construction??[]).filter(site=>!(next.construction??[]).some(work=>work.id===site.id));
     const erected=next.buildings.filter(b=>!oldBuildings.has(b.id));
     const counts={
       home:erected.filter(b=>b.kind===1).length,
@@ -132,9 +139,7 @@ export function App(){
     };
     const populationDelta=getStats(next).population-getStats(previous).population;
     setCityMoment(getCityMoment(previous,next));
-    const detail=erected.length
-      ?'新築 '+[counts.home&&`住宅${counts.home}棟`,counts.shop&&`商業${counts.shop}棟`,counts.industry&&`工業${counts.industry}棟`].filter(Boolean).join('・')
-      :'新築なし（開発状況を確認してください）';
+    const detail=[started.length&&`着工 ${started.length}件`,completed.length&&`完成 ${completed.length}件`,erected.length&&`新築 ${erected.length}棟`].filter(Boolean).join(' ／ ')||'新たな着工なし（需要を確認してください）';
     setMessage(`${monthText(next.month)}：${detail} ／ 人口 ${populationDelta>0?'+':''}${populationDelta}人`);
     editedRef.current=true;
     undoRef.current=null;setCanUndo(false);
@@ -183,7 +188,7 @@ export function App(){
       void saveCity(result.city).catch(()=>setSaveLabel('保存エラー'));
     }
   };
-  const setCurrentTool=(t:Tool)=>{setMobileBuildGroup(categoryOfTool(t));setMobileToolsOpen(true);setTool(t);setMode(canDragPaint(t)?'paint':'pan');setActive('build');setMessage(t==='inspect'?'調べたい建物や道路をクリックしてください':`${toolNames[t]}：土地をクリックして配置してください`);};
+  const setCurrentTool=(t:Tool)=>{setMapQuickGroup(categoryOfTool(t));setMobileBuildGroup(categoryOfTool(t));setMobileToolsOpen(true);setTool(t);setMode(canDragPaint(t)?'paint':'pan');setActive('build');setMessage(t==='inspect'?'調べたい建物や道路をクリックしてください':`${toolNames[t]}：土地をクリックして配置してください`);};
   const restoreBackup=async()=>{try{const saved=await loadCity('backup');if(!saved){setMessage('復元できるバックアップがありません');return;}if(!window.confirm('前回の自動保存から復元しますか？ 現在の未保存の変更は失われます。'))return;const next={...saved,paused:true};editedRef.current=true;cityRef.current=next;setCity(next);undoRef.current=null;setCanUndo(false);await saveCity(next);setMessage('バックアップから復元しました');}catch(e){setMessage(e instanceof Error?e.message:'バックアップを読み込めませんでした');}};
   const manualSave=()=>{void saveCity(cityRef.current,'manual').then(()=>{setSaveLabel('手動保存完了');setMessage('都市を保存しました');}).catch(()=>setMessage('保存に失敗しました'));};
   const doImport=async(f:File|undefined)=>{if(!f)return;try{const next=await importCity(f);next.paused=true;editedRef.current=true;cityRef.current=next;setCity(next);undoRef.current=null;setCanUndo(false);await saveCity(next);setMessage('都市のデータを読み込みました');}catch(e){setMessage(e instanceof Error?e.message:'読込エラー');}};
@@ -237,11 +242,31 @@ export function App(){
               <button className="motion-toggle" aria-pressed={motion} aria-label={motion?'演出を停止':'演出を再開'} title="街のアニメーション" onClick={()=>setMotion(value=>!value)}>{motion?'✦':'◌'}</button>
             </div>
           </div>
+          {active==='build'&&<div className={`map-quick-menu ${mapQuickOpen?'is-open':''}`} aria-label="地図上の建設メニュー">
+            <button type="button" className="map-quick-trigger" aria-label={mapQuickOpen?'地図の建設メニューを閉じる':'地図の建設メニューを開く'} aria-expanded={mapQuickOpen} onClick={()=>setMapQuickOpen(v=>!v)}>
+              <span>▦</span><strong>{mapQuickOpen?'建設メニューを閉じる':'地図で建設'}</strong><b>{mapQuickOpen?'⌄':'⌃'}</b>
+            </button>
+            {mapQuickOpen&&<div className="map-quick-body">
+              <div className="map-quick-categories" role="group" aria-label="地図建設カテゴリ">
+                {buildGroups.map(group=><button key={group.id} type="button" aria-pressed={mapQuickGroup===group.id} className={mapQuickGroup===group.id?'selected':''}
+                  onClick={()=>setMapQuickGroup(group.id)}><span>{group.glyph}</span>{group.label}</button>)}
+              </div>
+              <div className="map-quick-tools" role="group" aria-label="地図建設コマンド">
+                {palettes.filter(p=>categoryOfTool(p.tool)===mapQuickGroup).map(p=>
+                  <button key={p.tool} type="button" aria-label={`地図で${toolNames[p.tool]}を選択`} title={p.hint} aria-pressed={tool===p.tool} className={tool===p.tool?'chosen':''}
+                    onClick={()=>setCurrentTool(p.tool)}><span>{p.icon}</span><strong>{toolNames[p.tool]}</strong></button>)}
+              </div>
+              <div className="map-quick-footer"><span>{toolNames[tool]} · {mode==='paint'?'指で描く':'地図を移動'}</span>
+                <button type="button" onClick={()=>setMode(mode==='paint'?'pan':'paint')} disabled={!canDragPaint(tool)}>{mode==='paint'?'✥ 移動':'✎ 描く'}</button>
+                <button type="button" className="map-quick-step" onClick={()=>progressMonth(true)}>翌月へ ›</button>
+              </div>
+            </div>}
+          </div>}
           {cityMoment&&<div key={cityMoment.key} className={`city-growth-moment moment-${cityMoment.kind}`} role="status">
             <span className="city-growth-spark">✦</span><div><strong>{cityMoment.title}</strong><p>{cityMoment.detail}</p></div>
             <button type="button" onClick={()=>setCityMoment(null)} aria-label="成長のお知らせを閉じる">✕</button>
           </div>}
-          {active==='build'&&<div className="mobile-progress-chip" role="status"><span>🏗 建築可能 {readyToBuild}区画</span><span>建築待ち {waiting}区画</span></div>}
+          {active==='build'&&<div className="mobile-progress-chip" role="status"><span>🏗 工事中 {activeSites.length}件</span><span>開発可能 {readyToBuild}区画 · 建築待ち {waiting}区画</span></div>}
           {selected&&tool==='inspect'&&<div className="mobile-tile-info" role="note"><div><strong>区画 {selected.x}, {selected.y}</strong><button aria-label="区画情報を閉じる" onClick={()=>setSelected(null)}>✕</button></div><p>{selectedDescription}</p></div>}
           {active==='residents'&&<div className="land-legend" aria-label="土地評価の凡例"><strong>土地評価</strong><span><i className="land-low"/>低い</span><span><i className="land-mid"/>普通</span><span><i className="land-high"/>高い</span></div>}
           {active==='traffic'&&<div className="traffic-legend" aria-label="推定交通量の凡例"><strong>交通負荷</strong><span><i className="traffic-low"/>余裕</span><span><i className="traffic-medium"/>注意</span><span><i className="traffic-high"/>混雑</span></div>}
@@ -255,8 +280,9 @@ export function App(){
             <div><small>工業の建築待ち</small><strong>{development.pending.industry}<em>区画</em></strong><span>建築可能 {development.ready.industry}</span></div>
           </div>
           <p className="development-guidance" role="status">{developmentHint}</p>
+          <div className="construction-summary" aria-label="工事の進捗"><strong>工事中：{activeSites.length}件</strong><span>{nextCompletion===null?'進行中の工事はありません':`次の完成まで あと${nextCompletion}か月`}</span></div>
           {development.disconnected>0&&<p className="development-disconnected">道路に接していない開発待ち地区：{development.disconnected}区画</p>}
-          <div className="development-actions"><span>地区指定だけでは建物は建ちません。時間を進めると自動で発展します。</span><button type="button" onClick={()=>progressMonth(true)}>翌月へ進めて発展を確認 →</button></div>
+          <div className="development-actions"><span>地区を指定すると需要に応じて自動着工。建物の完成までゲーム内で1〜6か月かかります。</span><button type="button" onClick={()=>progressMonth(true)}>翌月へ進めて発展を確認 →</button></div>
         </section>}
         {active==='build'&&<div className={`build-panel ${mobileToolsOpen?'':'dock-collapsed'}`} data-mobile-category={mobileBuildGroup}><div className="panel-title"><strong>建設・都市開発</strong><span>設置する施設を選択</span><button className="undo-button" onClick={undo} disabled={!canUndo} title="Ctrl+Z / ⌘Z">↶ 元に戻す</button><button className="mobile-dock-toggle" aria-label={mobileToolsOpen?'建設メニューを閉じる':'建設メニューを開く'} aria-expanded={mobileToolsOpen} onClick={()=>setMobileToolsOpen(v=>!v)}>{mobileToolsOpen?'⌄ 閉じる':'⌃ 建設を開く'}</button></div><div className="mobile-build-categories" role="group" aria-label="建設カテゴリ">{buildGroups.map(group=><button key={group.id} aria-pressed={mobileBuildGroup===group.id} className={mobileBuildGroup===group.id?'selected':''} onClick={()=>setMobileBuildGroup(group.id)}><span>{group.glyph}</span> {group.label}</button>)}</div><div className="tool-grid">{palettes.map(p=><button key={p.tool} data-category={categoryOfTool(p.tool)} title={p.hint} aria-pressed={tool===p.tool} onClick={()=>setCurrentTool(p.tool)} className={`tool-tile ${tool===p.tool?'active':''}`}><span className="tool-glyph">{p.icon}</span><strong>{toolNames[p.tool]}</strong><small>{COSTS[p.tool]===0?'選択':`${format(COSTS[p.tool])} C`}</small></button>)}</div><p className="mobile-build-advice">{developmentHint}</p></div>}
         {active==='traffic'&&<div className="data-panel traffic-panel">
