@@ -309,3 +309,14 @@
  .map-quick-tools button{min-height:53px}
  .map-quick-tools button strong{font-size:9px}
 }
+
+/* When the legacy phone dock is expanded, the floating map command trigger
+ * must stay ABOVE it; otherwise the fixed dock masks the button completely. */
+@media(max-width:700px){
+ .app-shell[data-tools-open="yes"] .map-quick-menu{
+   bottom:calc(258px + env(safe-area-inset-bottom));
+ }
+ .app-shell[data-tools-open="yes"] .map-quick-menu.is-open{
+   bottom:calc(258px + env(safe-area-inset-bottom));
+ }
+}
