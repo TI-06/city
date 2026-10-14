@@ -453,7 +453,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
       monthElapsed=Math.min(20/Math.max(1,city.speed),monthElapsed+elapsed);
     }
     siteDrawElapsed+=elapsed;
-    if(siteDrawElapsed>(mobileCanvas?.16:.11) && !city.paused && city.construction?.length){
+    if(siteDrawElapsed>(mobileCanvas?0.16:0.11) && !city.paused && city.construction?.length){
       siteDrawElapsed=0;
       const fraction=motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0;
       renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),
