@@ -73,7 +73,7 @@ describe('monthly staged property development',()=>{
     expect(JSON.stringify(active)).toBe(original);
     if(active.construction?.length){
       const altered=structuredClone(active);
-      altered.construction![0]!.duration=-1;
+      altered.construction![0]={...altered.construction![0]!,duration:-1};
       expect(()=>validateCity(altered)).toThrow('工事');
     }
   });
