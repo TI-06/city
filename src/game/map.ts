@@ -365,18 +365,49 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);
   resetView();
   let down:{pointer:number;originX:number;originY:number;panX:number;panY:number;action:'pan'|'paint';path:TilePoint[];moved:boolean}|null=null;
+  // Two fingers always navigate (pan + pinch), even if a paint tool is active.
+  // The second touch aborts the stroke rather than placing an accidental road.
+  const touches=new Map<number,{x:number;y:number}>();
+  let pinch:{distance:number;zoom:number;worldX:number;worldY:number}|null=null;
+  const touchPair=()=>{
+    const [a,b]=[...touches.values()];
+    if(!a||!b)return null;
+    return {x:(a.x+b.x)/2,y:(a.y+b.y)/2,distance:Math.max(1,Math.hypot(a.x-b.x,a.y-b.y))};
+  };
+
   const point=(e:PointerEvent)=>hitTile(app.canvas,e.clientX,e.clientY,panX,panY,zoom);
   const local=(e:PointerEvent|WheelEvent)=>{const r=app.canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
   const pointerDown=(e:PointerEvent)=>{
-    if(down)return;
     if(e.pointerType==='mouse'&&e.button!==0&&e.button!==1&&e.button!==2)return;
-    const position=local(e),hit=point(e);
+    const position=local(e);
+    if(e.pointerType==='touch'){
+      touches.set(e.pointerId,position);
+      if(app.canvas.setPointerCapture)app.canvas.setPointerCapture(e.pointerId);
+      const pair=touchPair();
+      if(pair){
+        down=null;hover=null;
+        pinch={distance:pair.distance,zoom,worldX:(pair.x-panX)/zoom,worldY:(pair.y-panY)/zoom};
+        updateOverlay();return;
+      }
+    }
+    if(down||pinch)return;
+    const hit=point(e);
     const action=e.button===1||e.button===2||mode==='pan'||!canDragPaint(tool)?'pan':'paint';
     down={pointer:e.pointerId,originX:position.x,originY:position.y,panX,panY,action,path:hit?[hit]:[],moved:false};
-    if(app.canvas.setPointerCapture)app.canvas.setPointerCapture(e.pointerId);
+    if(e.pointerType!=='touch'&&app.canvas.setPointerCapture)app.canvas.setPointerCapture(e.pointerId);
     updateOverlay();
   };
   const pointerMove=(e:PointerEvent)=>{
+    if(e.pointerType==='touch'&&touches.has(e.pointerId)){
+      touches.set(e.pointerId,local(e));
+      const pair=touchPair();
+      if(pinch&&pair){
+        zoom=Math.max(.3,Math.min(2.4,pinch.zoom*pair.distance/pinch.distance));
+        panX=pair.x-pinch.worldX*zoom;panY=pair.y-pinch.worldY*zoom;
+        updateCamera();return;
+      }
+    }
+    if(pinch)return;
     if(!down){if(e.pointerType==='mouse'||e.pointerType==='pen'){const next=point(e);if(next?.x!==hover?.x||next?.y!==hover?.y){hover=next;updateOverlay();}}return;}
     if(down.pointer!==e.pointerId)return;
     const p=local(e);if(Math.hypot(p.x-down.originX,p.y-down.originY)>5)down.moved=true;
@@ -388,6 +419,14 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     }
   };
   const finish=(e:PointerEvent,cancelled:boolean)=>{
+    if(e.pointerType==='touch'){
+      touches.delete(e.pointerId);
+      if(pinch){
+        pinch=null;down=null;hover=null;updateOverlay();
+        if(app.canvas.hasPointerCapture?.(e.pointerId))app.canvas.releasePointerCapture(e.pointerId);
+        return;
+      }
+    }
     if(!down||down.pointer!==e.pointerId)return;
     const gesture=down;down=null;
     if(!cancelled){
@@ -401,7 +440,12 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   };
   const pointerUp=(e:PointerEvent)=>finish(e,false);
   const pointerCancel=(e:PointerEvent)=>finish(e,true);
-  const lostCapture=(e:PointerEvent)=>{if(down?.pointer===e.pointerId){down=null;updateOverlay();}};
+  const lostCapture=(e:PointerEvent)=>{
+    touches.delete(e.pointerId);
+    if(pinch){pinch=null;down=null;}
+    if(down?.pointer===e.pointerId){down=null;}
+    updateOverlay();
+  };
   const leave=()=>{if(!down){hover=null;updateOverlay();}};
   const contextMenu=(e:MouseEvent)=>e.preventDefault();
   const wheel=(e:WheelEvent)=>{e.preventDefault();const p=local(e);zoomBy(e.deltaY<0?1.12:1/1.12,p.x,p.y);};
