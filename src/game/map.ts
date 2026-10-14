@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js';
 import { buildAmbientScene, type AmbientScene } from './ambient';
+import {appendGrowthPulses,detectGrowthEvents,visualMood,type CityMood,type GrowthPulse} from './visual-state';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { analyzeLand } from '../core/land';
@@ -148,6 +149,33 @@ function renderAmbient(g:Graphics,scene:AmbientScene,time:number){
       .stroke({color:0xe3fcfd,width:1.6,alpha});
   }
 }
+/**
+ * The city-condition layer is independent of the 4,096 cached map tiles.
+ * Stable markers remain visible even when motion is disabled.
+ */
+function renderCityEffects(g:Graphics,city:City,mood:CityMood,pulses:readonly GrowthPulse[],time:number,motion:boolean){
+  g.clear();
+  if(mood==='crisis'||mood==='repairs'){
+    const caution=mood==='crisis'?0xd16d59:0xd49c54;
+    const source=city.services.slice(0,10);
+    for(const service of source){
+      const p=tilePosition(service.x,service.y);
+      g.circle(p.x+14,p.y-11,5).fill({color:caution,alpha:.9});
+      g.circle(p.x+14,p.y-11,2).fill(0xfff9e3);
+    }
+  }
+  if(!motion)return;
+  for(const pulse of pulses){
+    const age=time-pulse.createdAt;
+    if(age<0||age>=3)continue;
+    const pt=tilePosition(pulse.x,pulse.y);
+    const t=age/3,alpha=.8*(1-t);
+    const gold=pulse.kind==='upgrade'?0xffdb73:pulse.kind==='service'?0x77dbec:0x9ce4a1;
+    const radius=6+16*t;
+    g.circle(pt.x,pt.y-12,radius).stroke({width:2.5-1.4*t,color:gold,alpha});
+    g.circle(pt.x,pt.y-12,3+4*t).fill({color:gold,alpha:alpha*.42});
+  }
+}
 function renderTrafficHeatmap(g:Graphics, city:City){
   g.clear();
   const traffic=analyzeTraffic(city);
@@ -202,11 +230,11 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   const app=new Application();
   await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2)});
   const stage=new Container();
-  const terrain=new Graphics(),structures=new Graphics(),ambient=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
-  stage.addChild(terrain,structures,ambient,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
+  const terrain=new Graphics(),structures=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
+  stage.addChild(terrain,structures,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
   app.canvas.style.touchAction='none';
   let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false,landVisible=false;
-  let scene=buildAmbientScene(initial),motionEnabled=!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  let scene=buildAmbientScene(initial),mood=visualMood(initial),pulses:GrowthPulse[]=[],motionEnabled=!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   let animationTime=0,frameBudget=0;
   const onAnimationFrame=(ticker:Ticker)=>{
     if(!motionEnabled||document.hidden)return;
@@ -214,6 +242,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     if(frameBudget<33)return;
     animationTime+=Math.min(0.075,frameBudget/1000);frameBudget=0;
     renderAmbient(ambient,scene,animationTime);
+    if(pulses.length){pulses=pulses.filter(p=>animationTime-p.createdAt<3);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);}
   };
   app.ticker.add(onAnimationFrame);
   let zoom=.85,panX=0,panY=0;
@@ -225,7 +254,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     const worldX=(cx-panX)/zoom,worldY=(cy-panY)/zoom;
     panX=cx-worldX*next;panY=cy-worldY*next;zoom=next;updateCamera();
   };
-  renderTerrain(terrain,city);renderStructures(structures,city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);resetView();
+  renderTerrain(terrain,city);renderStructures(structures,city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);resetView();
   let down:{pointer:number;originX:number;originY:number;panX:number;panY:number;action:'pan'|'paint';path:TilePoint[];moved:boolean}|null=null;
   const point=(e:PointerEvent)=>hitTile(app.canvas,e.clientX,e.clientY,panX,panY,zoom);
   const local=(e:PointerEvent|WheelEvent)=>{const r=app.canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
@@ -275,13 +304,15 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects;
+      if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
+      mood=visualMood(next);
       city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
-      if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);}updateOverlay();},
+      if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
-    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else ambient.clear();},
+    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();pulses=[];}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       app.ticker.remove(onAnimationFrame);
