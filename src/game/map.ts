@@ -492,7 +492,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     siteDrawElapsed+=elapsed;
     const tweenElapsed=monthTweenStart===null?Infinity:animationTime-monthTweenStart;
     if(monthTweenStart!==null&&tweenElapsed>=1.9)monthTweenStart=null;
-    if(siteDrawElapsed>(mobileCanvas?.14:.10)&&city.construction?.length){
+    if(siteDrawElapsed>(mobileCanvas?0.14:0.10)&&city.construction?.length){
       siteDrawElapsed=0;
       const ease=Math.min(1,tweenElapsed/1.9);
       const fraction=monthTweenStart!==null?-(1-ease)*(1-ease)
@@ -584,10 +584,11 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   const focusTile=(x:number,y:number)=>{
     const target=tilePosition(x,y);
     // Keep a visible chunk of the neighborhood at the chosen destination.
-    zoom=Math.max(zoom,mobileCanvas?.98:.9);
+    zoom=Math.max(zoom,mobileCanvas?0.98:0.9);
     panX=host.clientWidth/2-target.x*zoom;
     panY=host.clientHeight*.53-(target.y+HH)*zoom;
     updateCamera();
+    app.canvas.dataset.focusedTile=`${x},${y}`;
     renewNeighborhood(true);
   };
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
