@@ -135,9 +135,9 @@ function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,de
 /** A construction site stays on the map for entire game months.
  * The silhouette and stage depend on the saved month, not frame animation.
  */
-function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail){
-  const p=tilePosition(site.x,site.y),t=constructionProgress(site,city.month);
-  const phase=constructionPhase(site,city.month);
+function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail,monthFraction=0){
+  const p=tilePosition(site.x,site.y),t=constructionProgress(site,city.month+monthFraction);
+  const phase=constructionPhase(site,city.month+monthFraction);
   const target:Building={id:site.id,x:site.x,y:site.y,kind:site.kind,level:site.level,residents:0,jobs:0};
   const old=site.upgradeFrom===undefined?0:getBuildingStyle({...target,level:site.upgradeFrom},city.seed).height;
   const desired=getBuildingStyle(target,city.seed).height;
@@ -168,6 +168,19 @@ function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:Struct
     g.circle(p.x+17,p.y+HH+11,2).fill(0xe6dbb3);
   }
 }
+/** Construction is animated during the currently simulated month, and stops
+ * at the exact saved monthly state when paused or motion is disabled.
+ * Culling keeps worksite meshes bounded to what the player can see.
+ */
+function renderConstructionSites(g:Graphics,city:City,detail:StructureDetail,
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},fraction:number){
+  g.clear();
+  for(const site of city.construction??[]){
+    if(!tileNearViewport(site.x,site.y,viewport.width,viewport.height,
+      viewport.panX,viewport.panY,viewport.zoom,170))continue;
+    renderWorkSite(g,city,site,detail,fraction);
+  }
+}
 function renderTerrain(g:Graphics,city:City){
   g.clear();
   for(let sum=0;sum<2*SIZE-1;sum++)for(let y=Math.max(0,sum-SIZE+1);y<=Math.min(SIZE-1,sum);y++){
@@ -189,14 +202,14 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
   let renderedTiles=0;
   const buildings=new Map(city.buildings.map(b=>[tileIndex(b.x,b.y),b]));
   const services=new Map(city.services.map(s=>[tileIndex(s.x,s.y),s]));
-  const sites=new Map((city.construction??[]).map(site=>[tileIndex(site.x,site.y),site]));
+  const sites=new Set((city.construction??[]).map(site=>tileIndex(site.x,site.y)));
   for(let sum=window.minX+window.minY;sum<=window.maxX+window.maxY;sum++)
     for(let y=Math.max(window.minY,sum-window.maxX);y<=Math.min(window.maxY,sum-window.minX);y++){
     const x=sum-y,i=tileIndex(x,y);
     if(!tileNearViewport(x,y,viewport.width,viewport.height,viewport.panX,viewport.panY,viewport.zoom))continue;
     renderedTiles++;
     if(city.land[i]===0)continue;
-    const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i),site=sites.get(i);
+    const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i),site=sites.has(i);
     if(city.zones[i]){
       diamond(g,p.x,p.y,COVERAGE[city.zones[i]!]!,0.42);
       if(!b&&!site){
@@ -225,7 +238,7 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
       }
     }
     if(site){
-      renderWorkSite(g,city,site,detail);
+      // A small, separately updated graphics layer renders active work sites.
     }else if(b){
       if(!constructionTiles.has(i))drawCityBuilding(g,p.x,p.y,b,city.seed,detail);
     } else if(s){
@@ -416,17 +429,27 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   // Avoid 60 high-cost full-stage renders each second for a slowly moving city.
   app.ticker.maxFPS=30;
   const stage=new Container();
-  const terrain=new Graphics(),structures=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
-  stage.addChild(terrain,structures,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
+  const terrain=new Graphics(),structures=new Graphics(),worksites=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
+  stage.addChild(terrain,structures,worksites,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
   app.canvas.style.touchAction='none';
   let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false,landVisible=false;
   let scene=buildAmbientScene(initial),mood=visualMood(initial),pulses:GrowthPulse[]=[],motionEnabled=!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  let animationTime=0,frameBudget=0;
+  let animationTime=0,frameBudget=0,monthElapsed=0,siteDrawElapsed=0;
   const onAnimationFrame=(ticker:Ticker)=>{
     if(!motionEnabled||document.hidden)return;
     frameBudget+=Math.min(75,ticker.deltaMS);
     if(frameBudget<33)return;
-    animationTime+=Math.min(0.075,frameBudget/1000);frameBudget=0;
+    const elapsed=Math.min(0.075,frameBudget/1000);animationTime+=elapsed;frameBudget=0;
+    if(!city.paused){
+      monthElapsed=Math.min(20/Math.max(1,city.speed),monthElapsed+elapsed);
+    }
+    siteDrawElapsed+=elapsed;
+    if(siteDrawElapsed>.095 && city.construction?.length){
+      siteDrawElapsed=0;
+      const fraction=motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0;
+      renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),
+        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},fraction);
+    }
     renderAmbient(ambient,scene,animationTime);
     if(pulses.length){
       const before=pulses.length;
@@ -470,7 +493,8 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   // Phone play starts close enough to see houses, people and traffic.
   // Players can pinch out for an overview at any time.
   const resetView=()=>{zoom=mobileCanvas?0.78:Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
-  const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();};
+  const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();
+    renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);};
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
     const next=Math.max(.3,Math.min(2.4,zoom*factor));
@@ -576,21 +600,24 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   app.canvas.addEventListener('lostpointercapture',lostCapture);app.canvas.addEventListener('pointerleave',leave);
   app.canvas.addEventListener('wheel',wheel,{passive:false});app.canvas.addEventListener('contextmenu',contextMenu);
   // Re-evaluate visible structures after container/layout/rotation changes.
-  const resizeObserver=new ResizeObserver(()=>refreshVisibleStructures(true));
+  const resizeObserver=new ResizeObserver(()=>{refreshVisibleStructures(true);
+    renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);});
   resizeObserver.observe(host);
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
-      const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
+      const monthChanged=next.month!==city.month;
+      const visualChanged=mapChanged||monthChanged||next.construction!==city.construction||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects||next.policy!==city.policy||next.month!==city.month;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
-      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
+      if(monthChanged)monthElapsed=0;
+      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
       if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
-    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
+    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},0);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       resizeObserver.disconnect();
