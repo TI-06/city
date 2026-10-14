@@ -162,7 +162,7 @@ export function applyStroke(current: City, tool: Tool, points: readonly Readonly
   }
   if (applied===0) return {ok:false,changed:false,message:lastReason,city:current};
   const status=skipped?`（配置できない${skipped}マスはスキップ）`:'';
-  return {ok:true,changed:true,message:`${toolNames[tool]}：${applied}マスを${tool==='bulldoze'?'撤去':'配置'}しました${status}`,city:next};
+  return {ok:true,changed:true,message:`${toolNames[tool]}：${applied}マスを${tool==='bulldoze'?'撤去':tool==='arterial'?'改良':'配置'}しました${status}`,city:next};
 }
 
 /** Non-mutating indication used for tile hover highlights. */
