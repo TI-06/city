@@ -303,6 +303,74 @@ export function App(){
               </div>
             </div>}
           </div>}
+          {active==='build'&&<div className={`mayor-control ${mayorOpen?'open':''}`} aria-label="地図上の市長コマンド">
+            <button type="button" className="mayor-trigger" onClick={openMayor}
+              aria-label={mayorOpen?'市長コマンドを閉じる':'市長コマンドを開く'} aria-expanded={mayorOpen}>
+              <span>⚑</span><strong>市長コマンド</strong><span>{mayorOpen?'⌄':'⌃'}</span>
+            </button>
+            {mayorOpen&&<section className="mayor-sheet" role="region" aria-label="市長コマンドの操作">
+              <div className="mayor-sheet-header"><div><strong>市政と都市経営</strong><small>地図を離れずに変更できます</small></div>
+                <button type="button" onClick={()=>setMayorOpen(false)} aria-label="市長コマンドの操作を閉じる">✕</button>
+              </div>
+              <div className="mayor-sections" role="group" aria-label="市長コマンドの分類">
+                {([{id:'policy',label:'市政方針'},{id:'budget',label:'税金・予算'},{id:'investment',label:'大型投資'},{id:'analysis',label:'街の診断'}] as const)
+                  .map(item=><button type="button" key={item.id} aria-pressed={mayorSection===item.id}
+                    className={mayorSection===item.id?'selected':''} onClick={()=>setMayorSection(item.id)}>{item.label}</button>)}
+              </div>
+              <div className="mayor-sheet-content">
+                {mayorSection==='policy'&&<div className="mayor-policy-grid" role="group" aria-label="地図から市政方針を選択">
+                  {([{id:'balanced',desc:'生活と経済を両立'},{id:'growth',desc:'産業と税収を重視'},{id:'eco',desc:'環境と暮らしを優先'},{id:'mobility',desc:'交通負荷を軽減'}] as {id:Policy;desc:string}[])
+                    .map(item=><button key={item.id} type="button" aria-pressed={city.policy===item.id}
+                      className={city.policy===item.id?'selected':''} onClick={()=>applyPolicy(item.id)}>
+                      <strong>{POLICY_LABELS[item.id]}</strong><small>{item.desc}</small></button>)}
+                  <p className="mayor-note">現在：{POLICY_LABELS[city.policy]} · 毎月の収支 {stats.balance>=0?'+':''}{format(stats.balance)} C</p>
+                </div>}
+                {mayorSection==='budget'&&<div className="mayor-budget">
+                  <div className="mayor-tax"><label htmlFor="mayor-tax">住民税率 <strong>{city.tax}%</strong></label>
+                    <input id="mayor-tax" type="range" min="3" max="18" value={city.tax}
+                      onChange={e=>applyTax(Number(e.target.value))}/></div>
+                  <strong className="mayor-subtitle">施設の維持方針</strong>
+                  <div className="mayor-choice-grid" role="group" aria-label="地図から維持方針を変更">
+                    {(['minimum','standard','preventive'] as const).map(plan=><button key={plan}
+                      type="button" aria-pressed={stats.maintenancePlan===plan} className={stats.maintenancePlan===plan?'selected':''}
+                      onClick={()=>applyMaintenance(plan)}>{MAINTENANCE_LABELS[plan]}</button>)}
+                  </div>
+                  <strong className="mayor-subtitle">財政の運営</strong>
+                  <div className="mayor-choice-grid" role="group" aria-label="地図から財政運営を変更">
+                    {([{id:'normal',label:'通常運営'},{id:'austerity',label:'支出抑制'}] as const).map(option=>
+                      <button type="button" key={option.id} aria-pressed={stats.fiscalMode===option.id}
+                        className={stats.fiscalMode===option.id?'selected':''} onClick={()=>setFiscalMode(option.id)}>{option.label}</button>)}
+                  </div>
+                  <div className="mayor-budget-footer"><span>市の資金 {format(city.funds)} C</span>
+                    <button type="button" disabled={stats.debtHeadroom<BOND_AMOUNT} onClick={borrow}>市債を発行</button></div>
+                </div>}
+                {mayorSection==='investment'&&<div className="mayor-investments">
+                  {(['transit','housing','culture'] as const).map(kind=>{
+                    const cost=capitalNextCost(city,kind);
+                    return <div className="mayor-invest-row" key={kind}>
+                      <div><strong>{CAPITAL_LABELS[kind]}</strong><small>Lv.{capitalLevel(city,kind)} / 3 · {cost===undefined?'整備完了':`${format(cost)} C`}</small></div>
+                      <button type="button" onClick={()=>invest(kind)} disabled={cost===undefined||city.funds<cost}
+                        aria-label={`地図から${CAPITAL_LABELS[kind]}へ投資`}>投資</button>
+                    </div>;
+                  })}
+                  <p className="mayor-note">事業は街全体に反映され、毎月の運営費も増加します。</p>
+                </div>}
+                {mayorSection==='analysis'&&<div className="mayor-analysis">
+                  <div className="mayor-snapshot"><span>人口 <strong>{format(stats.population)}人</strong></span>
+                    <span>満足度 <strong>{stats.happiness}</strong></span>
+                    <span>交通混雑 <strong>{stats.congestion}%</strong></span>
+                    <span>工事 <strong>{activeSites.length}件</strong></span></div>
+                  <strong className="mayor-subtitle">マップで確認</strong>
+                  <div className="mayor-choice-grid" role="group" aria-label="地図の分析表示">
+                    {([{id:'normal',name:'通常地図'},{id:'traffic',name:'交通量'},{id:'land',name:'土地評価'}] as const).map(item=>
+                      <button key={item.id} type="button" className={mapLayer===item.id?'selected':''} aria-pressed={mapLayer===item.id}
+                        onClick={()=>{setMapLayer(item.id);setMayorOpen(false);}}>{item.name}</button>)}
+                  </div>
+                  <button type="button" className="mayor-data-link" onClick={()=>openData('finance')}>都市データの詳細を見る ↗</button>
+                </div>}
+              </div>
+            </section>}
+          </div>}
           {active==='build'&&focusSite&&<button type="button" className="map-construction-focus"
             onClick={viewConstruction} aria-label="工事現場へ移動する">
             <span className="construction-pulse-dot"/> 🏗 工事中 {activeSites.length}件 <strong>現場を見る ↗</strong>
@@ -335,6 +403,12 @@ export function App(){
           <div className="development-actions"><span>地区を指定すると需要に応じて自動着工。建物の完成までゲーム内で1〜6か月かかります。</span><button type="button" onClick={()=>progressMonth(true)}>翌月へ進めて発展を確認 →</button></div>
         </section>}
         {active==='build'&&<div className={`build-panel ${mobileToolsOpen?'':'dock-collapsed'}`} data-mobile-category={mobileBuildGroup}><div className="panel-title"><strong>建設・都市開発</strong><span>設置する施設を選択</span><button className="undo-button" onClick={undo} disabled={!canUndo} title="Ctrl+Z / ⌘Z">↶ 元に戻す</button><button className="mobile-dock-toggle" aria-label={mobileToolsOpen?'建設メニューを閉じる':'建設メニューを開く'} aria-expanded={mobileToolsOpen} onClick={()=>setMobileToolsOpen(v=>!v)}>{mobileToolsOpen?'⌄ 閉じる':'⌃ 建設を開く'}</button></div><div className="mobile-build-categories" role="group" aria-label="建設カテゴリ">{buildGroups.map(group=><button key={group.id} aria-pressed={mobileBuildGroup===group.id} className={mobileBuildGroup===group.id?'selected':''} onClick={()=>setMobileBuildGroup(group.id)}><span>{group.glyph}</span> {group.label}</button>)}</div><div className="tool-grid">{palettes.map(p=><button key={p.tool} data-category={categoryOfTool(p.tool)} title={p.hint} aria-pressed={tool===p.tool} onClick={()=>setCurrentTool(p.tool)} className={`tool-tile ${tool===p.tool?'active':''}`}><span className="tool-glyph">{p.icon}</span><strong>{toolNames[p.tool]}</strong><small>{COSTS[p.tool]===0?'選択':`${format(COSTS[p.tool])} C`}</small></button>)}</div><p className="mobile-build-advice">{developmentHint}</p></div>}
+        {active==='data'&&<div className="city-data-tabs" role="tablist" aria-label="都市データの表示切替">
+          {([{id:'finance',label:'財政と経済'},{id:'traffic',label:'交通・物流'},{id:'residents',label:'住民と人口'},{id:'policy',label:'政策と行政'}] as const)
+            .map(item=><button key={item.id} type="button" role="tab" aria-selected={dataView===item.id}
+              className={dataView===item.id?'selected':''} onClick={()=>setDataView(item.id)}>{item.label}</button>)}
+          <button type="button" className="data-back-to-city" onClick={()=>switchMenu('build')}>↶ 地図に戻る</button>
+        </div>}
         {active==='data'&&dataView==='traffic'&&<div className="data-panel traffic-panel">
           <div className="panel-title"><strong>交通分析</strong><span>道路の接続・通勤・物流の推定値</span></div>
           <div className="metric-grid">
