@@ -1,4 +1,5 @@
-import { SIZE, type Building, type City } from './city';
+import { SIZE } from './grid';
+import type { Building, City } from './city';
 
 /**
  * Phase 2: deterministic, aggregate road-network commute + freight model.
@@ -74,6 +75,7 @@ type Anchor = Readonly<{ building: Building; access: number; component: number }
 
 export function analyzeTraffic(city: City): TrafficAnalysis {
   const roads = city.roads;
+  if (roads.length !== CELL_COUNT) throw new RangeError('Invalid road grid length');
   const network = getNetwork(roads);
   const roadVolume = new Float64Array(CELL_COUNT);
   const populationByComponent = new Float64Array(network.componentCount);
