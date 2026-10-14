@@ -7,7 +7,7 @@ test('map renders and editor controls work without runtime exceptions', async ({
   await expect(page.getByRole('heading',{name:'みどり野市'})).toBeVisible();
   const canvas=page.locator('.map-host canvas');
   await expect(canvas).toBeVisible({timeout:30_000});
-  await expect(page.getByText('マップ稼働中')).toBeVisible();
+  await expect(page.locator('.map-status')).toContainText('マップ稼働中');
   await page.locator('.tool-tile').filter({hasText:'道路'}).click();
   await expect(page.locator('.view-modes button').nth(1)).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:'縮小'}).click();
