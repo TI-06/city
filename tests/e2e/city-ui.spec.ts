@@ -90,3 +90,18 @@ test('resident land valuation map and neighborhood metrics work on desktop and m
   await expect(page.locator('.map-host canvas')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
+
+test('residential demand dashboard explains actual occupancy and rent on desktop/mobile', async ({page}) => {
+  const errors:string[]=[];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'住民と人口'}).click();
+  await expect(page.getByText('住宅の収容人数')).toBeVisible();
+  await expect(page.getByText('住宅の空き')).toBeVisible();
+  await expect(page.getByText('推定家賃')).toBeVisible();
+  await expect(page.getByText('家賃負担率')).toBeVisible();
+  await expect(page.getByText('来月の推定人口移動')).toBeVisible();
+  await expect(page.locator('.housing-advice')).toBeVisible();
+  expect(errors).toEqual([]);
+});
