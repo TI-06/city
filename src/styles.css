@@ -41,3 +41,7 @@
 .land-low{background:#d77a69}.land-mid{background:#e5bf66}.land-high{background:#39b979}
 .selected-land-value{margin-top:6px!important;color:#368968!important}.selected-land-value strong{color:#276246}
 @media(max-width:600px){.land-legend{top:62px;right:8px;gap:6px;padding:7px;font-size:9px}}
+
+/* Phase 2-6 housing market interpretation */
+.housing-advice{margin-top:14px;padding:13px 15px;border:1px solid #d6e8de;border-radius:10px;background:#edf7f1;color:#355f4e;line-height:1.65;font-size:12px;}
+.housing-advice::before{content:'住宅市場のヒント';display:block;font-weight:750;margin-bottom:5px;color:#267d5a;}
