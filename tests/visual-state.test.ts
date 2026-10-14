@@ -1,6 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import {advanceMonths,createCity,type City} from '../src/core/city';
-import {appendGrowthPulses,detectGrowthEvents,visualMood} from '../src/game/visual-state';
+import {appendGrowthPulses,detectGrowthEvents,visualMood,constructionStage,CONSTRUCTION_SECONDS} from '../src/game/visual-state';
 
 describe('visual city development and municipal warnings',()=>{
   it('classifies insolvent and maintenance-backlog cities with priority',()=>{
@@ -26,7 +26,7 @@ describe('visual city development and municipal warnings',()=>{
     expect(detectGrowthEvents(after,before)).toEqual([]);
     expect(detectGrowthEvents({...before,name:'old'},after)).toEqual([]);
   });
-  it('bounds many simultaneous build effects and removes them after three seconds',()=>{
+  it('bounds many simultaneous build effects and removes them after the construction cycle',()=>{
     const base=createCity('建築更新',53);
     const newer:City=structuredClone(base);
     newer.month++;
@@ -37,7 +37,11 @@ describe('visual city development and municipal warnings',()=>{
     expect(first).toHaveLength(10);
     const second=appendGrowthPulses(first,events,5);
     expect(second).toHaveLength(10);
-    expect(appendGrowthPulses(second,[],8.5)).toHaveLength(0);
+    expect(appendGrowthPulses(second,[],5+CONSTRUCTION_SECONDS+.1)).toHaveLength(0);
+    expect(constructionStage(0)).toBe('foundation');
+    expect(constructionStage(2)).toBe('frame');
+    expect(constructionStage(4.6)).toBe('finish');
+    expect(constructionStage(CONSTRUCTION_SECONDS)).toBe('done');
   });
   it('does not persist frame effects into city saves after 10 years of play',()=>{
     const state=advanceMonths(createCity('長期の街',101),120);
