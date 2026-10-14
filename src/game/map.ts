@@ -1,5 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
+import { analyzeTraffic, ROAD_CAPACITY } from '../core/traffic';
 import { appendLine, canDragPaint, insideTile, type InteractionMode, type TilePoint } from '../core/paint';
 
 const HW = 26;
@@ -106,6 +107,20 @@ function renderStructures(g:Graphics,city:City){
     }
   }
 }
+function renderTrafficHeatmap(g:Graphics, city:City){
+  g.clear();
+  const traffic=analyzeTraffic(city);
+  for(let i=0;i<city.roads.length;i++){
+    if(city.roads[i]!==1)continue;
+    const load=traffic.roadVolume[i]??0;
+    if(load<=0)continue;
+    const p=tilePosition(i%SIZE,Math.floor(i/SIZE));
+    const ratio=load/ROAD_CAPACITY;
+    const color=ratio<0.6?0x43c69c:ratio<1?0xe9cc62:ratio<1.5?0xf2a14f:0xe26658;
+    diamond(g,p.x,p.y,color,ratio<1?0.4:0.65);
+    if(ratio>=1.5)g.circle(p.x,p.y+HH,3).fill({color:0xffefdd,alpha:0.82});
+  }
+}
 function renderOverlay(g:Graphics,city:City,selection:TilePoint|null,hover:TilePoint|null,stroke:readonly TilePoint[],tool:Tool){
   g.clear();
   if(selection){const p=tilePosition(selection.x,selection.y);diamondStroke(g,p.x,p.y,0xfafdf6,2.2);}
@@ -124,6 +139,7 @@ export type MapController = {
   setCity:(city:City)=>void;
   setSelected:(point:TilePoint|null,tool:Tool)=>void;
   setMode:(mode:InteractionMode)=>void;
+  setTrafficView:(enabled:boolean)=>void;
   resetView:()=>void;
   zoomBy:(factor:number)=>void;
   destroy:()=>void;
@@ -132,10 +148,10 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   const app=new Application();
   await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2)});
   const stage=new Container();
-  const terrain=new Graphics(),structures=new Graphics(),overlay=new Graphics();
-  stage.addChild(terrain,structures,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
+  const terrain=new Graphics(),structures=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
+  stage.addChild(terrain,structures,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
   app.canvas.style.touchAction='none';
-  let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan';
+  let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false;
   let zoom=.85,panX=0,panY=0;
   const resetView=()=>{zoom=Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);};
@@ -194,9 +210,11 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
-      city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged)renderStructures(structures,city);updateOverlay();},
+      city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);}updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
-    setMode(next){mode=next;hover=null;updateOverlay();},resetView,zoomBy:factor=>zoomBy(factor),
+    setMode(next){mode=next;hover=null;updateOverlay();},
+    setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
+    resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       app.canvas.removeEventListener('pointerdown',pointerDown);app.canvas.removeEventListener('pointermove',pointerMove);
       app.canvas.removeEventListener('pointerup',pointerUp);app.canvas.removeEventListener('pointercancel',pointerCancel);
