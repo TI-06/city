@@ -216,10 +216,8 @@ export function App(){
     else setMode('pan');
   };
   const openMapQuick=()=>{
-    setMapQuickOpen(prev=>{
-      if(!prev&&window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);
-      return !prev;
-    });
+    if(!mapQuickOpen&&window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);
+    setMapQuickOpen(prev=>!prev);
   };
   const selectedStyle=selected?buildingStyleLabel(city,selected.x,selected.y):null;
   const selectedDescription=selected?`${selectedStyle?`${selectedStyle} ／ `:''}${describeTile(city,selected.x,selected.y)}`:'マップをクリックして土地を選択';
