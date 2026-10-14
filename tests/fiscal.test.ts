@@ -73,6 +73,7 @@ describe('Phase 4 municipal debt and fiscal recovery',()=>{
   it('exposes negative cash flow without creating magical bailout money',()=>{
     const city=createCity('危機市',555);
     city.buildings=city.buildings.filter(b=>b.kind!==1);
+    city.zones=city.zones.map(z=>z===1?0:z);
     const startFunds=city.funds;
     const next=advanceMonths(city,24);
     expect(next.funds).toBeLessThan(startFunds);
