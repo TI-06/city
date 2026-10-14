@@ -194,3 +194,18 @@ test('OS reduced-motion preference disables ambient animation by default',async 
   await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
   await expect(page.getByRole('button',{name:'演出を再開'})).toHaveAttribute('aria-pressed','false');
 });
+
+test('map communicates municipal status without layout overflow',async ({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',err=>errors.push(err.message));
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await expect(page.getByRole('status',{name:/街の状態：/})).toBeVisible();
+  const indicator=page.locator('.map-civic-indicator');
+  await expect(indicator).toHaveCount(1);
+  const width=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth}));
+  expect(width.scroll).toBeLessThanOrEqual(width.viewport+2);
+  await page.getByRole('button',{name:'財政と経済'}).click();
+  await expect(indicator).toBeVisible();
+  expect(errors).toEqual([]);
+});

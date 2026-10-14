@@ -95,3 +95,10 @@
 .motion-toggle[aria-pressed="true"]{color:#227c65;background:#e2f7ea!important}
 .motion-toggle[aria-pressed="false"]{color:#71817b;background:#edf0ef!important}
 .motion-toggle:focus-visible{outline:3px solid #5cb5ec;outline-offset:2px}
+
+/* Phase 4-3: communicate municipal conditions without shifting the map layout */
+.map-civic-indicator{display:inline-flex;gap:5px;align-items:center;font-size:10px;font-weight:750;white-space:nowrap;border-radius:20px;border:1px solid #cbe2d3;padding:4px 9px;background:#eff8f0;color:#317b57}
+.map-civic-indicator.mood-crisis{background:#fff0ea;color:#aa4838;border-color:#eebca9}
+.map-civic-indicator.mood-repairs{background:#fff6e8;color:#9c7130;border-color:#edd6a8}
+.map-civic-indicator.mood-developing{background:#e9f6fb;color:#2e788b;border-color:#bae0e8}
+@media(max-width:600px){.map-heading-right{gap:5px}.map-civic-indicator{font-size:9px;padding:4px 6px}.map-size{display:none}}
