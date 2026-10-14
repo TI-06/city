@@ -21,6 +21,15 @@ test('city play is one persistent map for construction, tax, policy and investme
  await expect(tax).toHaveValue('8');
  await page.getByRole('group',{name:'都市運営コマンド'}).getByRole('button',{name:'投資'}).click();
  await expect(page.getByRole('button',{name:/交通ネットワーク強化 Lv/})).toBeVisible();
+ await page.getByRole('group',{name:'都市運営コマンド'}).getByRole('button',{name:'予算'}).click();
+ const maintenance=page.getByRole('group',{name:'地図上の保全計画'});
+ await maintenance.getByRole('button',{name:'予防保全'}).click();
+ await expect(maintenance.getByRole('button',{name:'予防保全'})).toHaveAttribute('aria-pressed','true');
+ const fiscal=page.getByRole('group',{name:'地図上の財政運営'});
+ await fiscal.getByRole('button',{name:'支出抑制'}).click();
+ await expect(fiscal.getByRole('button',{name:'支出抑制'})).toHaveAttribute('aria-pressed','true');
+ await expect(page.getByRole('button',{name:/市債で 25,000 C を調達/})).toBeVisible();
+ await expect(map).toBeVisible();
  await page.getByRole('group',{name:'都市運営コマンド'}).getByRole('button',{name:'交通'}).click();
  await expect(page.getByRole('group',{name:'簡易交通分析'})).toBeVisible();
  await expect(map).toBeVisible();
