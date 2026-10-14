@@ -4,7 +4,7 @@ export type TilePoint = Readonly<{ x: number; y: number }>;
 export type InteractionMode = 'pan' | 'paint';
 
 export function canDragPaint(tool: Tool): boolean {
-  return tool === 'road' || tool === 'home' || tool === 'shop' || tool === 'industry' || tool === 'bulldoze';
+  return tool === 'road' || tool === 'arterial' || tool === 'home' || tool === 'shop' || tool === 'industry' || tool === 'bulldoze';
 }
 
 /** Add Manhattan-connected tiles even if the pointer jumps between events. */

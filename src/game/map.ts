@@ -1,6 +1,6 @@
 import { Application, Container, Graphics } from 'pixi.js';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
-import { analyzeTraffic, ROAD_CAPACITY } from '../core/traffic';
+import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { appendLine, canDragPaint, insideTile, type InteractionMode, type TilePoint } from '../core/paint';
 
 const HW = 26;
@@ -76,14 +76,16 @@ function renderStructures(g:Graphics,city:City){
       if(!b){g.circle(p.x,p.y+HH,2.5).fill({color:COVERAGE[city.zones[i]!]!,alpha:.9});}
     }
     if(city.roads[i]){
-      diamond(g,p.x,p.y,0x647879);
+      diamond(g,p.x,p.y,city.roads[i]===2?0x485b6f:0x647879);
+      if(city.roads[i]===2)diamond(g,p.x,p.y,0x8bacc1,0.13);
       const dirs=[[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy])=>{
-        const xx=x+dx!, yy=y+dy!;return xx>=0&&yy>=0&&xx<SIZE&&yy<SIZE&&city.roads[tileIndex(xx,yy)]===1;
+        const xx=x+dx!, yy=y+dy!;return xx>=0&&yy>=0&&xx<SIZE&&yy<SIZE&&(city.roads[tileIndex(xx,yy)]??0)>0;
       });
       const [west,east,north,south]=dirs;
       if(west||east)g.moveTo(p.x-15,p.y+6).lineTo(p.x+15,p.y+20).stroke({width:1.4,color:0xf5d5a0,alpha:.76});
       if(north||south)g.moveTo(p.x+15,p.y+6).lineTo(p.x-15,p.y+20).stroke({width:1.4,color:0xf5d5a0,alpha:.76});
       if((west||east)&&(north||south))g.circle(p.x,p.y+HH,2).fill(0xf4d4a6);
+      if(city.roads[i]===2){g.circle(p.x-9,p.y+HH-4,2).fill(0xffe8a8);g.circle(p.x+9,p.y+HH+4,2).fill(0xffe8a8);}
     }
     if(b){
       const h=b.kind===1?13+b.level*7:b.kind===2?24+b.level*9:19+b.level*9;
@@ -111,11 +113,11 @@ function renderTrafficHeatmap(g:Graphics, city:City){
   g.clear();
   const traffic=analyzeTraffic(city);
   for(let i=0;i<city.roads.length;i++){
-    if(city.roads[i]!==1)continue;
+    if(!city.roads[i])continue;
     const load=traffic.roadVolume[i]??0;
     if(load<=0)continue;
     const p=tilePosition(i%SIZE,Math.floor(i/SIZE));
-    const ratio=load/ROAD_CAPACITY;
+    const ratio=load/getRoadCapacity(city.roads[i]!);
     const color=ratio<0.6?0x43c69c:ratio<1?0xe9cc62:ratio<1.5?0xf2a14f:0xe26658;
     diamond(g,p.x,p.y,color,ratio<1?0.4:0.65);
     if(ratio>=1.5)g.circle(p.x,p.y+HH,3).fill({color:0xffefdd,alpha:0.82});

@@ -8,7 +8,7 @@ test('map renders and editor controls work without runtime exceptions', async ({
   const canvas=page.locator('.map-host canvas');
   await expect(canvas).toBeVisible({timeout:30_000});
   await expect(page.locator('.map-status')).toContainText('マップ稼働中');
-  await page.locator('.tool-tile').filter({hasText:'道路'}).click();
+  await page.locator('.tool-tile[title="道路を建設"]').click();
   await expect(page.locator('.view-modes button').nth(1)).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:'縮小'}).click();
   await page.getByRole('button',{name:'拡大'}).click();
@@ -63,4 +63,17 @@ test('mobility policy can be activated and restored after reload', async ({page}
   await page.reload();
   await page.getByRole('button',{name:'政策と行政'}).click();
   await expect(page.locator('.policy-option.current')).toContainText('公共交通重視');
+});
+
+test('arterial upgrade tool is available in the city map editor on mobile and desktop', async ({page}) => {
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'都市建設'}).click();
+  const arterial=page.locator('.tool-tile').filter({hasText:'幹線道路'});
+  await arterial.click();
+  await expect(arterial).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.view-modes button').nth(1)).toHaveAttribute('aria-pressed','true');
+  await page.getByRole('button',{name:/交通・物流/}).click();
+  await expect(page.getByText('幹線道路に改良済み')).toBeVisible();
+  await expect(page.getByText(/容量は85、幹線道路は220/)).toBeVisible();
 });

@@ -7,6 +7,9 @@ import type { Building, City } from './city';
  * No per-person vehicles or unbounded historical route data are retained.
  */
 export const ROAD_CAPACITY = 85;
+export const ARTERIAL_CAPACITY = 220;
+/** Baseline roads=1, arterial roads=2; absent roads have no capacity. */
+export function getRoadCapacity(roadType:number):number{return roadType===2?ARTERIAL_CAPACITY:roadType===1?ROAD_CAPACITY:0;}
 const MAX_DELAY = 8;
 const CELL_COUNT = SIZE * SIZE;
 const LABOR_RATIO = 0.53;
@@ -31,10 +34,10 @@ function neighbors(index: number, roads: readonly number[]): number[] {
   const x = index % SIZE;
   const y = Math.floor(index / SIZE);
   const next: number[] = [];
-  if (y > 0 && roads[index - SIZE] === 1) next.push(index - SIZE);
-  if (x > 0 && roads[index - 1] === 1) next.push(index - 1);
-  if (x < SIZE - 1 && roads[index + 1] === 1) next.push(index + 1);
-  if (y < SIZE - 1 && roads[index + SIZE] === 1) next.push(index + SIZE);
+  if (y > 0 && (roads[index - SIZE] ?? 0) > 0) next.push(index - SIZE);
+  if (x > 0 && (roads[index - 1] ?? 0) > 0) next.push(index - 1);
+  if (x < SIZE - 1 && (roads[index + 1] ?? 0) > 0) next.push(index + 1);
+  if (y < SIZE - 1 && (roads[index + SIZE] ?? 0) > 0) next.push(index + SIZE);
   return next;
 }
 
@@ -60,10 +63,10 @@ function getNetwork(roads: number[]): Network {
 /** Select a building's lowest-index orthogonally adjacent road tile. */
 export function buildingRoadAccess(roads: readonly number[], x: number, y: number): number | undefined {
   const adjacent: number[] = [];
-  if (y > 0 && roads[(y - 1) * SIZE + x] === 1) adjacent.push((y - 1) * SIZE + x);
-  if (x > 0 && roads[y * SIZE + x - 1] === 1) adjacent.push(y * SIZE + x - 1);
-  if (x < SIZE - 1 && roads[y * SIZE + x + 1] === 1) adjacent.push(y * SIZE + x + 1);
-  if (y < SIZE - 1 && roads[(y + 1) * SIZE + x] === 1) adjacent.push((y + 1) * SIZE + x);
+  if (y > 0 && (roads[(y - 1) * SIZE + x] ?? 0) > 0) adjacent.push((y - 1) * SIZE + x);
+  if (x > 0 && (roads[y * SIZE + x - 1] ?? 0) > 0) adjacent.push(y * SIZE + x - 1);
+  if (x < SIZE - 1 && (roads[y * SIZE + x + 1] ?? 0) > 0) adjacent.push(y * SIZE + x + 1);
+  if (y < SIZE - 1 && (roads[(y + 1) * SIZE + x] ?? 0) > 0) adjacent.push((y + 1) * SIZE + x);
   return adjacent.length ? Math.min(...adjacent) : undefined;
 }
 
@@ -85,7 +88,7 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
   for (const b of [...city.buildings].sort((a, c) => a.id - c.id)) {
     const access = buildingRoadAccess(roads, b.x, b.y);
     const component = access === undefined ? -1 : network.componentByTile[access]!;
-    if (b.kind === 1 && b.residents > 0) {
+    if (b.kind > 0 && b.residents > 0) {
       if (component < 0 || access === undefined) inaccessibleResidents += b.residents;
       else {
         populationByComponent[component] = populationByComponent[component]! + b.residents;
@@ -158,9 +161,11 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
   for (let i = 0; i < CELL_COUNT; i++) {
     const load = roadVolume[i]!;
     if (load <= 0) continue;
-    if (load > ROAD_CAPACITY) congestedRoads++;
+    const capacity=getRoadCapacity(roads[i]!);
+    if(capacity===0)continue;
+    if (load > capacity) congestedRoads++;
     worstRoadLoad = Math.max(worstRoadLoad, load);
-    const saturation = load / ROAD_CAPACITY;
+    const saturation = load / capacity;
     const delay = Math.min(MAX_DELAY, 1 + 0.15 * Math.pow(saturation, 4));
     totalRoadLoad += load;
     weightedDelay += load * delay;

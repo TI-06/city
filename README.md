@@ -103,3 +103,11 @@ Deferred: dynamic lane capacity, intersections/signals, public transit, destinat
 - City operating expenses increase by 90 C + 0.14 C × population per month.
 - When congestion is high, reduced traffic may recover resident happiness and enterprise efficiency; the municipal budget pays for the improvement. It is not an automatic free bonus.
 - This is an economy-level policy, not yet a rendered physical bus or rail network. Save schema remains v1; previous policies and saves remain compatible.
+
+## Phase 2-4: 幹線道路への改良
+
+- 既存の一般道路 (`roads=1`) を建設ツール「幹線道路」で `roads=2` に改良。ドラッグ一括改良・Undo・撤去に対応。
+- 工事費: **420 C/タイル**。道路交通容量: **85 → 220**。月次維持費: **0.85 → 3.25 C/タイル**（基本行政費とは別）。
+- 幹線道路は見た目と交通ヒートマップの双方に反映。道路接続・住宅開発条件も従来どおり維持。
+- 保存は既存の `schema:1` の `roads[]` に `2` を追加する方式で、旧データの `0,1` はそのまま読み込める。旧クライアントへ戻すと新データは読み込めないため、更新前のエクスポートを推奨。
+- 注意: 車線数や速度を個別シミュレートするものではなく、混雑度を交通容量で近似したゲーム用モデル。
