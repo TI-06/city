@@ -2,7 +2,7 @@ import type {City,Building} from '../core/city';
 import {getBuildingStyle} from './building-style';
 
 /** Short-lived UI-only notifications, derived from two immutable city states. */
-export type CityMoment=Readonly<{key:string;title:string;detail:string;kind:'milestone'|'construction'|'redevelopment'}>;
+export type CityMoment=Readonly<{key:string;title:string;detail:string;kind:'milestone'|'construction'|'redevelopment';point?:Readonly<{x:number;y:number}>}>;
 const checkpoints=[250,500,1000,2500,5000,10000,25000,50000,100000];
 const population=(city:City)=>city.buildings.reduce((n,b)=>n+b.residents,0);
 
