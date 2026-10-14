@@ -470,7 +470,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',
     resolution:Math.min(window.devicePixelRatio||1,mobileCanvas?1.5:2)});
   // Avoid 60 high-cost full-stage renders each second for a slowly moving city.
-  app.ticker.maxFPS=mobileCanvas?24:30;
+  app.ticker.maxFPS=30;
   const stage=new Container();
   const terrain=new Graphics(),structures=new Graphics(),worksites=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
   stage.addChild(terrain,structures,worksites,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
@@ -484,7 +484,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   const onAnimationFrame=(ticker:Ticker)=>{
     if(!motionEnabled||document.hidden)return;
     frameBudget+=Math.min(75,ticker.deltaMS);
-    if(frameBudget<(mobileCanvas?42:33))return;
+    if(frameBudget<33)return;
     const elapsed=Math.min(0.075,frameBudget/1000);animationTime+=elapsed;frameBudget=0;
     if(!city.paused){
       monthElapsed=Math.min(20/Math.max(1,city.speed),monthElapsed+elapsed);
@@ -577,7 +577,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   // Players can pinch out for an overview at any time.
   const resetView=()=>{zoom=mobileCanvas?0.78:Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{
-    app.ticker.maxFPS=mobileCanvas?(zoom<.7?18:24):30;
+    app.ticker.maxFPS=mobileCanvas&&zoom<.7?24:30;
     stage.scale.set(zoom);stage.position.set(panX,panY);
     refreshVisibleStructures();refreshSites();renewNeighborhood();
   };
