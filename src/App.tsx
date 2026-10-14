@@ -5,6 +5,7 @@ import {BOND_AMOUNT,type FiscalMode} from './core/fiscal';
 import {CAPITAL_LABELS,CAPITAL_NOTES,capitalLevel,capitalNextCost,type CapitalKind} from './core/capital';
 import {applyStroke,advanceMonths,changePolicy,changeTax,changeMaintenancePlan,fundCapitalProject,changeFiscalMode,issueMunicipalBond,createCity,describeTile,getStats,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS,tileIndex} from './core/city';
 import {mountMap,type MapController} from './game/map';
+import {visualMood} from './game/visual-state';
 import {canDragPaint,type InteractionMode,type TilePoint} from './core/paint';
 import {exportCity,importCity,loadCity,loadLatestCity,saveCity} from './persistence/storage';
 
@@ -50,6 +51,8 @@ export function App(){
   const mapHost=useRef<HTMLDivElement>(null);const mapRef=useRef<MapController|null>(null);
   const importRef=useRef<HTMLInputElement>(null);
   const stats=getStats(city);
+  const visualStatus=visualMood(city);
+  const visualLabel=visualStatus==='crisis'?'財政危機':visualStatus==='repairs'?'修繕の遅れ':visualStatus==='developing'?'都市発展中':'安定した街';
   const land=useMemo(()=>analyzeLand(city),[city]);
   const onTiles=useCallback((points:readonly TilePoint[])=>{
     const last=points[points.length-1];
@@ -143,14 +146,14 @@ export function App(){
       <nav aria-label="メインメニュー" className="menu">
         {([{id:'build',icon:'▦',name:'都市建設'},{id:'finance',icon:'▥',name:'財政と経済'},{id:'traffic',icon:'⇄',name:'交通・物流'},{id:'residents',icon:'♙',name:'住民と人口'},{id:'policy',icon:'⚑',name:'政策と行政'}] as const).map(item=><button key={item.id} className={`menu-link ${active===item.id?'active':''}`} onClick={()=>setActive(item.id)}><span className="menu-icon">{item.icon}</span>{item.name}{active===item.id&&<span className="menu-dot"/>}</button>)}
       </nav>
-      <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · LIVING CITY 0.7</div></div>
+      <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · CITY GROWTH 0.8</div></div>
     </aside>
     <section className="workspace">
       <header className="topbar"><div className="breadcrumb">CITY OVERVIEW <span>/</span> <strong>{active==='build'?'都市建設':active==='finance'?'財政と経済':active==='traffic'?'交通・物流':active==='residents'?'住民と人口':'政策と行政'}</strong></div><div className="top-actions"><span className="autosave"><span className="save-dot"/>{saveLabel}</span><button className="top-button" onClick={manualSave}>保存</button><button className="top-button" onClick={()=>setHelp(true)} aria-label="ヘルプ">？</button></div></header>
       <div className="city-bar"><div><div className="eyebrow">MY CITY · JAPAN</div><div className="city-heading"><h1>{city.name}</h1><span className="level-tag">発展中の街</span></div><p>あなたの選択が、街の未来をつくる。</p></div><div className="time-control"><div className="date-label">▣ {monthText(city.month)}</div><div className="time-buttons"><button aria-label={city.paused?'再生':'一時停止'} onClick={toggle} className="play-button">{city.paused?'▶':'Ⅱ'}</button>{([1,2,4] as const).map(n=><button key={n} className={!city.paused&&city.speed===n?'chosen':''} onClick={()=>setSpeed(n)}>×{n}</button>)}</div></div></div>
       <div className="stat-strip"><div className="stat"><span>総人口</span><strong>{format(stats.population)} <small>人</small></strong><em>⌁ 街の住民</em></div><div className="stat"><span>市の資金</span><strong>{format(city.funds)} <small>C</small></strong><em>◈ 現在の予算</em></div><div className="stat"><span>月間収支</span><strong className={stats.balance>=0?'positive':'negative'}>{stats.balance>=0?'+':''}{format(stats.balance)} <small>C</small></strong><em>前月規模の見込み</em></div><div className="stat"><span>住民満足度</span><strong>{stats.happiness}<small> / 100</small></strong><div className="mini-progress"><i style={{width:`${stats.happiness}%`}}/></div></div></div>
       <div className="content-area">
-        <div className="main-panel"><div className="map-heading"><div><strong>都市マップ</strong><span>建設・道路・地区を編集</span></div><div className="map-heading-right"><span className="map-status"><b/> {ready?'マップ稼働中':'読み込み中'}</span><span className="map-size">64 × 64</span></div></div><div className="map-host" ref={mapHost}>
+        <div className="main-panel"><div className="map-heading"><div><strong>都市マップ</strong><span>建設・道路・地区を編集</span></div><div className="map-heading-right"><span className="map-status"><b/> {ready?'マップ稼働中':'読み込み中'}</span><span className={`map-civic-indicator mood-${visualStatus}`} aria-label={`街の状態：${visualLabel}`} role="status">{visualStatus==='crisis'?'⚠':visualStatus==='repairs'?'◆':'✦'} {visualLabel}</span><span className="map-size">64 × 64</span></div></div><div className="map-host" ref={mapHost}>
           <div className="map-floating-toolbar" aria-label="マップ操作">
             <div className="view-modes" role="group" aria-label="操作モード">
               <button aria-pressed={mode==='pan'} className={mode==='pan'?'is-active':''} onClick={()=>setMode('pan')}>✥ 移動</button>
@@ -248,6 +251,6 @@ export function App(){
         <div className="inspector-foot"><button onClick={()=>exportCity(city)}>都市データを書き出す ↗</button><button onClick={()=>importRef.current?.click()}>データを読み込む ↥</button><button onClick={()=>{void restoreBackup();}}>前回のバックアップを復元 ↶</button><input ref={importRef} type="file" accept=".json,application/json" hidden onChange={e=>{void doImport(e.currentTarget.files?.[0]);e.currentTarget.value='';}}/><button className="new-game" onClick={()=>{if(window.confirm('現在の都市を新規作成しますか？ 自動保存は上書きされます。')){const next=createCity();editedRef.current=true;setCity(next);cityRef.current=next;setSelected(null);undoRef.current=null;setCanUndo(false);setMode('pan');setTool('inspect');void saveCity(next);setMessage('新しい都市を作りました');}}}>新しい都市を始める</button></div></aside>
       </div>
     </section>
-    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「住民と人口」では、学校・公園・産業施設などによる土地評価を地図で確認できます。</li><li>「財政と経済」でインフラ保全計画を選べます。維持費を削ると修繕の積み残しが増えます。</li><li>赤字対策には行政支出抑制か市債による資金調達がありますが、満足度低下や返済負担に注意してください。</li><li>新しい住宅は空室として建設され、雇用・家賃・空室に応じて入居します。失業や生活費が高い場合は転出も起こります。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>✦ボタンで車や煙、水面などの軽量アニメーションを停止・再開できます。端末の『動きを減らす』設定にも対応します。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
+    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「住民と人口」では、学校・公園・産業施設などによる土地評価を地図で確認できます。</li><li>「財政と経済」でインフラ保全計画を選べます。維持費を削ると修繕の積み残しが増えます。</li><li>赤字対策には行政支出抑制か市債による資金調達がありますが、満足度低下や返済負担に注意してください。</li><li>新しい住宅は空室として建設され、雇用・家賃・空室に応じて入居します。失業や生活費が高い場合は転出も起こります。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>✦ボタンで車や煙、水面などの軽量アニメーションを停止・再開できます。端末の『動きを減らす』設定にも対応します。</li><li>新築・増築時は建物の周囲に一時的な演出が表示されます。財政危機や修繕の遅れもマップ上の状態表示と公共施設の注意マーカーで確認できます。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
   </main>;
 }
