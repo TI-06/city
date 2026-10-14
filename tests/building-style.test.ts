@@ -11,7 +11,7 @@ describe('evolving skyline (visual-only schema 1)',()=>{
       // Neighborhood variety is defined across blocks/seeds, not necessarily
       // all alternative archetypes at a single fixed (x,y) tile.
       for(const seed of [17,12937,9993,211]){
-        for(const [x,y] of [[21,27],[5,5],[32,41],[14,37]]){
+        for(const [x,y] of [[21,27],[5,5],[32,41],[14,37]] as const){
           labels.add(getBuildingStyle({...building(kind,level),x,y},seed).name);
         }
       }
