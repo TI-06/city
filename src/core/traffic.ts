@@ -43,12 +43,12 @@ function getNetwork(roads: number[]): Network {
   const componentByTile = new Int32Array(CELL_COUNT).fill(-1);
   let componentCount = 0;
   for (let i = 0; i < CELL_COUNT; i++) {
-    if (roads[i] !== 1 || componentByTile[i] >= 0) continue;
+    if (roads[i] !== 1 || componentByTile[i]! >= 0) continue;
     const queue = [i];
     componentByTile[i] = componentCount;
     for (let q = 0; q < queue.length; q++) {
       for (const neighbor of neighbors(queue[q]!, roads)) {
-        if (componentByTile[neighbor] >= 0) continue;
+        if (componentByTile[neighbor]! >= 0) continue;
         componentByTile[neighbor] = componentCount;
         queue.push(neighbor);
       }
@@ -90,13 +90,13 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
     if (b.kind === 1 && b.residents > 0) {
       if (component < 0 || access === undefined) inaccessibleResidents += b.residents;
       else {
-        populationByComponent[component] += b.residents;
+        populationByComponent[component] = populationByComponent[component]! + b.residents;
         homeAnchors.push({ building: b, access, component });
       }
     } else if (b.kind !== 1 && b.jobs > 0) {
       if (component < 0 || access === undefined) roadlessJobs += b.jobs;
       else {
-        jobsByComponent[component] += b.jobs;
+        jobsByComponent[component] = jobsByComponent[component]! + b.jobs;
         jobAnchors.push({ building: b, access, component });
       }
     }
@@ -123,7 +123,7 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
   for (let q = 0; q < queue.length; q++) {
     const current = queue[q]!;
     for (const neighbor of neighbors(current, roads)) {
-      if (distance[neighbor] >= 0) continue;
+      if (distance[neighbor]! >= 0) continue;
       distance[neighbor] = distance[current]! + 1;
       nextToJob[neighbor] = current;
       queue.push(neighbor);
@@ -135,20 +135,20 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
   for (const home of homeAnchors) {
     const people = populationByComponent[home.component]!;
     const employedComp = employmentByComponent[home.component]!;
-    if (people === 0 || employedComp <= 0 || distance[home.access] < 0) continue;
+    if (people === 0 || employedComp <= 0 || distance[home.access]! < 0) continue;
     const weightedWorkers = employedComp * (home.building.residents / people);
     routedEmployees += weightedWorkers;
     commuteDistance += weightedWorkers * distance[home.access]!;
     let road = home.access;
     // Distances strictly decrease on every hop: no infinite routing loops.
     while (road >= 0) {
-      roadVolume[road] += weightedWorkers;
+      roadVolume[road] = roadVolume[road]! + weightedWorkers;
       road = nextToJob[road]!;
     }
   }
 
   // Deliveries create localized freight traffic without persisting vehicle agents.
-  for (const business of jobAnchors) roadVolume[business.access] += business.building.jobs * 0.15;
+  for (const business of jobAnchors) roadVolume[business.access] = roadVolume[business.access]! + business.building.jobs * 0.15;
 
   let congestedRoads = 0;
   let worstRoadLoad = 0;
