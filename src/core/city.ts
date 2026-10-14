@@ -2,6 +2,7 @@
 import { analyzeTraffic, getRoadCapacity } from './traffic';
 import { analyzeLand, developmentWeight } from './land';
 import { assessHousing, applyHousingMigration, housingCapacity } from './housing';
+import { infrastructureBudget, type MaintenancePlan } from './lifecycle';
 import { SIZE } from './grid';
 export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
@@ -15,8 +16,10 @@ export type City = {
   schema: 1; name: string; seed: number; random: number; month: number; funds: number; tax: number; policy: Policy;
   land: number[]; roads: number[]; zones: number[]; buildings: Building[]; services: Service[];
   nextId: number; history: History[]; paused: boolean; speed: 1 | 2 | 4;
+  /** Optional for save-schema-v1 compatibility with prior releases. */
+  maintenancePlan?: MaintenancePlan; maintenanceBacklog?: number;
 };
-export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; arterialRoads: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number; housingCapacity: number; housingVacancies: number; housingDemandGap: number; estimatedRent: number; rentBurden: number; affordability: number; expectedMigration: number };
+export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; arterialRoads: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number; housingCapacity: number; housingVacancies: number; housingDemandGap: number; estimatedRent: number; rentBurden: number; affordability: number; expectedMigration: number; renewalDue: number; renewalSpending: number; maintenanceBacklog: number; projectedMaintenanceBacklog: number; infrastructureCondition: number; matureCityServices: number; maintenancePlan: MaintenancePlan };
 
 const COST: Record<Tool, number> = { inspect: 0, road: 65, arterial: 420, home: 12, shop: 12, industry: 12, park: 750, school: 2900, clinic: 4200, bulldoze: 90 };
 export const COSTS = COST;
@@ -43,7 +46,7 @@ export function createCity(name = 'みどり野市', seed = 12937): City {
     return Math.abs(x-river)<=1 || lake ? 0 : 1;
   });
   const city: City = {schema:1, name,seed,random:seeded(seed)||1,month:0,funds:38000,tax:9,policy:'balanced',land,
-    roads:Array(SIZE*SIZE).fill(0), zones:Array(SIZE*SIZE).fill(0),buildings:[],services:[],nextId:1,history:[],paused:true,speed:1};
+    roads:Array(SIZE*SIZE).fill(0), zones:Array(SIZE*SIZE).fill(0),buildings:[],services:[],nextId:1,history:[],paused:true,speed:1,maintenancePlan:'standard',maintenanceBacklog:0};
   for (let x=17;x<=41;x++) for(const y of [23,31,39]) city.roads[idx(x,y)]=1;
   for (let y=18;y<=44;y++) for(const x of [20,29,38]) city.roads[idx(x,y)]=1;
   for (let y=18;y<=44;y++) for(let x=17;x<=42;x++){
@@ -76,10 +79,13 @@ export function getStats(city:City):Stats {
   const vacancies=Math.max(0,jobs-employed);
   const access=Math.min(16,city.services.filter(s=>s.kind!=='park').length*5);
   // Pollution affects happiness but never scales without bound solely from building count.
+  const lifecycle=infrastructureBudget(city);
   const pollution=Math.min(14,Math.round(industry*.24*(city.policy==='eco'?0.6:1)));
   const crowded=population>2000?Math.min(12,(population-2000)/200):0;
   const disconnectedPenalty=labor===0?0:Math.min(12,Math.round((labor-employed)/labor*12));
-  const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0)-Math.round(traffic.congestion*0.11)-disconnectedPenalty)));
+  const conditionPenalty=Math.round((100-lifecycle.condition)*0.26);
+  const preventionBonus=lifecycle.plan==='preventive'&&lifecycle.condition>=85?2:0;
+  const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0)-Math.round(traffic.congestion*0.11)-disconnectedPenalty-conditionPenalty+preventionBonus)));
   const housing=assessHousing(city,employed,happiness,analyzeLand(city));
   const housingPenalty=Math.min(12,Math.max(0,Math.round((housing.rentBurden-60)*0.4)));
   const adjustedHappiness=Math.max(20,happiness-housingPenalty);
@@ -88,8 +94,8 @@ export function getStats(city:City):Stats {
   // No corporate revenue from empty factories with no reachable workforce.
   const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor*traffic.productivity*laborUtilization);
   const transportProgram=city.policy==='mobility'?90+population*0.14:0;
-  const expenses=Math.round((roads-arterialRoads)*0.85+arterialRoads*3.25+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85+transportProgram);
-  return {population,jobs,employed,vacancies,happiness:adjustedHappiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,arterialRoads,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity,housingCapacity:housing.capacity,housingVacancies:housing.vacant,housingDemandGap:housing.demandGap,estimatedRent:housing.estimatedRent,rentBurden:housing.rentBurden,affordability:housing.affordability,expectedMigration:housing.monthlyMigrationEstimate};
+  const expenses=Math.round((roads-arterialRoads)*0.85+arterialRoads*3.25+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85+transportProgram+lifecycle.renewalSpend+lifecycle.maturityServices);
+  return {population,jobs,employed,vacancies,happiness:adjustedHappiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,arterialRoads,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity,housingCapacity:housing.capacity,housingVacancies:housing.vacant,housingDemandGap:housing.demandGap,estimatedRent:housing.estimatedRent,rentBurden:housing.rentBurden,affordability:housing.affordability,expectedMigration:housing.monthlyMigrationEstimate,renewalDue:lifecycle.renewalDue,renewalSpending:lifecycle.renewalSpend,maintenanceBacklog:lifecycle.backlog,projectedMaintenanceBacklog:lifecycle.nextBacklog,infrastructureCondition:lifecycle.condition,matureCityServices:lifecycle.maturityServices,maintenancePlan:lifecycle.plan};
 }
 const historyEntry=(city:City):History=>{const s=getStats(city);return {month:city.month,population:s.population,funds:city.funds,income:s.income,expense:s.expenses,happiness:s.happiness};};
 export type CommandResult = {ok:true;changed:boolean;message:string;city:City}|{ok:false;changed:false;message:string;city:City};
@@ -200,6 +206,7 @@ export function advanceMonths(current:City,count=1):City{
     // Income is assessed from the preceding month's current population and jobs.
     const stats=getStats(city);
     city.funds+=stats.balance;
+    city.maintenanceBacklog=stats.projectedMaintenanceBacklog;
     city.month++;
     const candidates: {x:number;y:number;kind:Exclude<Zone,0>}[]=[];
     const occupied=new Set(city.buildings.map(b=>idx(b.x,b.y)));
@@ -244,12 +251,19 @@ export function advanceMonths(current:City,count=1):City{
 }
 export function changePolicy(current:City,policy:Policy):City{if(current.policy===policy)return current;return {...current,policy};}
 export function changeTax(current:City,tax:number):City{if(!Number.isInteger(tax)||tax<3||tax>18)return current;return {...current,tax};}
+export function changeMaintenancePlan(current:City,plan:MaintenancePlan):City{
+  if(!['minimum','standard','preventive'].includes(plan))return current;
+  if((current.maintenancePlan??'standard')===plan)return current;
+  return {...current,maintenancePlan:plan};
+}
 export function validateCity(candidate:unknown):City{
   if(!candidate||typeof candidate!=='object')throw new Error('セーブ形式が正しくありません');
   const c=candidate as Partial<City>;
   if(c.schema!==SAVE_SCHEMA||!Array.isArray(c.land)||!Array.isArray(c.roads)||!Array.isArray(c.zones)||c.land.length!==SIZE*SIZE||c.roads.length!==SIZE*SIZE||c.zones.length!==SIZE*SIZE)throw new Error('対応していないセーブデータです');
   if(!Array.isArray(c.buildings)||!Array.isArray(c.services)||!Array.isArray(c.history)||!Number.isSafeInteger(c.funds)||!Number.isSafeInteger(c.month)||!Number.isSafeInteger(c.random)||!Number.isSafeInteger(c.nextId)||!Number.isInteger(c.tax)||c.tax!<3||c.tax!>18)throw new Error('セーブデータが破損しています');
   if(typeof c.name!=='string'||c.name.length>50||!['eco','growth','balanced','mobility'].includes(c.policy??''))throw new Error('都市の設定が無効です');
+  if(c.maintenancePlan!==undefined&&!['minimum','standard','preventive'].includes(c.maintenancePlan))throw new Error('保全方針が無効です');
+  if(c.maintenanceBacklog!==undefined&&(!Number.isSafeInteger(c.maintenanceBacklog)||c.maintenanceBacklog<0||c.maintenanceBacklog>100_000_000))throw new Error('修繕残高が不正です');
   const occupied=new Set<number>(),ids=new Set<number>();
   for(const b of c.buildings){if(!inside(b.x,b.y)||!Number.isInteger(b.id)||!Number.isInteger(b.level)||b.level<1||b.level>3||![1,2,3].includes(b.kind)||!Number.isSafeInteger(b.residents)||!Number.isSafeInteger(b.jobs))throw new Error('建物情報が無効です');const i=idx(b.x,b.y);if(occupied.has(i)||ids.has(b.id))throw new Error('建物が重複しています');occupied.add(i);ids.add(b.id);}
   for(const s of c.services){if(!inside(s.x,s.y)||!['park','school','clinic'].includes(s.kind)||!Number.isInteger(s.id))throw new Error('公共施設情報が無効です');const i=idx(s.x,s.y);if(occupied.has(i)||ids.has(s.id))throw new Error('公共施設が重複しています');occupied.add(i);ids.add(s.id);}
