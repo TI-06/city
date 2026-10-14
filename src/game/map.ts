@@ -135,7 +135,7 @@ function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,de
 /** A construction site stays on the map for entire game months.
  * The silhouette and stage depend on the saved month, not frame animation.
  */
-function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail,monthFraction=0){
+function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail,monthFraction=0,seconds=0,animated=true){
   const p=tilePosition(site.x,site.y),t=constructionProgress(site,city.month+monthFraction);
   const phase=constructionPhase(site,city.month+monthFraction);
   const target:Building={id:site.id,x:site.x,y:site.y,kind:site.kind,level:site.level,residents:0,jobs:0};
@@ -158,8 +158,39 @@ function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:Struct
     .stroke({color:0xf5bc62,width:1.6,alpha:.9});
   g.moveTo(p.x-20,p.y+HH+4).lineTo(p.x+19,p.y+HH+4)
     .stroke({color:0xe1b477,width:1.4,alpha:.75});
+  const swing=animated?Math.sin(seconds*1.8+site.id*2.3)*6:0;
   g.moveTo(p.x+19,top-11).lineTo(p.x-7,top-11).stroke({color:0xfce1a3,width:2.4});
-  g.moveTo(p.x-4,top-11).lineTo(p.x-4,top+1).stroke({color:0xb59b75,width:1.1});
+  g.moveTo(p.x-4+swing,top-11).lineTo(p.x-4+swing,top+7)
+    .stroke({color:0xb59b75,width:1.1});
+  g.poly([p.x-6+swing,top+6,p.x-2+swing,top+6,p.x-4+swing,top+9])
+    .fill(0xf3ba53);
+  if(animated){
+    // Small delivery trips and site workers make construction visibly active
+    // even when the player advances individual months while paused.
+    const trip=((seconds*.23+site.id*.131)%1+1)%1;
+    if(trip<.87){
+      const truckX=p.x-28+trip*49,y=p.y+HH*2+5;
+      g.roundRect(truckX,y-5,11,6,1.5).fill(0xeb9a40);
+      g.rect(truckX+7,y-8,4,4).fill(0xffe1a1);
+      g.circle(truckX+2,y+2,1.8).fill(0x343d43);
+      g.circle(truckX+9,y+2,1.8).fill(0x343d43);
+    }
+    for(let i=0;i<2;i++){
+      const walk=Math.sin(seconds*(1.1+i*.27)+site.id+i*2)*4;
+      const px=p.x+(i===0?-14:11)+walk,py=p.y+HH+10+(i===0?0:3);
+      g.circle(px,py-5,2.2).fill(0xffd578);
+      g.rect(px-1.8,py-2.8,3.6,4).fill(i===0?0xe9a442:0x77acd0);
+      g.moveTo(px,py+1).lineTo(px+Math.sin(seconds*3+i)*1.7,py+4)
+        .stroke({color:0x344f55,width:1.1});
+    }
+    const dust=((seconds*.35+site.id*.271)%1+1)%1;
+    if(dust<.7&&phase!=='finishing'){
+      const rise=dust/.7;
+      for(let i=0;i<2;i++)
+        g.circle(p.x-9+i*12+rise*3,p.y+HH+2-rise*15,3+rise*3)
+          .fill({color:0xe9d3a9,alpha:(1-rise)*.27});
+    }
+  }
   const barX=p.x-15,barY=p.y+HH*2+10;
   g.roundRect(barX,barY,30,5,2).fill(0x284d42);
   g.roundRect(barX,barY,Math.max(2,30*t),5,2).fill(0xffcc70);
@@ -173,12 +204,14 @@ function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:Struct
  * Culling keeps worksite meshes bounded to what the player can see.
  */
 function renderConstructionSites(g:Graphics,city:City,detail:StructureDetail,
-  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},fraction:number){
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},fraction:number,seconds=0,animated=true){
   g.clear();
+  let drawn=0;
   for(const site of city.construction??[]){
     if(!tileNearViewport(site.x,site.y,viewport.width,viewport.height,
       viewport.panX,viewport.panY,viewport.zoom,260))continue;
-    renderWorkSite(g,city,site,detail,fraction);
+    renderWorkSite(g,city,site,detail,fraction,seconds,animated);
+    if(++drawn>=16)break; // A bounded live-construction layer on low-end devices.
   }
 }
 function renderTerrain(g:Graphics,city:City){
@@ -428,6 +461,7 @@ export type MapController = {
   setMotion:(enabled:boolean)=>void;
   resetView:()=>void;
   zoomBy:(factor:number)=>void;
+  focusTile:(x:number,y:number)=>void;
   destroy:()=>void;
 };
 export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:readonly TilePoint[])=>void):Promise<MapController>{
