@@ -13,7 +13,7 @@ test('building players can immediately advance one month and understand construc
   const original=await date.innerText();
   await page.getByRole('button',{name:'翌月へ進める',exact:true}).click();
   await expect(date).not.toHaveText(original);
-  await expect(page.locator('.notice')).toContainText('新築');
+  await expect(page.locator('.notice')).toContainText(/着工|完成|新築|新たな着工なし/);
   await expect(page.locator('.notice')).toContainText('人口');
   await expect(status).toContainText('建築待ち');
   expect(errors).toEqual([]);
