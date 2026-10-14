@@ -45,3 +45,17 @@
 /* Phase 2-6 housing market interpretation */
 .housing-advice{margin-top:14px;padding:13px 15px;border:1px solid #d6e8de;border-radius:10px;background:#edf7f1;color:#355f4e;line-height:1.65;font-size:12px;}
 .housing-advice::before{content:'住宅市場のヒント';display:block;font-weight:750;margin-bottom:5px;color:#267d5a;}
+
+/* Phase 3 fiscal choice: readable on compact screens */
+.maintenance-panel{margin-top:20px;padding:16px;border-radius:13px;border:1px solid #dce7e2;background:#f8fbf9}
+.maintenance-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:13px}
+.maintenance-option{display:flex;flex-direction:column;gap:5px;min-width:0;text-align:left;border:1px solid #dce6e1;background:#fff;border-radius:10px;padding:12px;cursor:pointer;color:#23453f}
+.maintenance-option b{font-size:12px}.maintenance-option small{font-size:10px;line-height:1.5;color:#67837a}
+.maintenance-option.current{background:#ebf8ef;border-color:#348e6a;box-shadow:0 0 0 1px #348e6a}
+.maintenance-option:focus-visible{outline:3px solid #50a4dd;outline-offset:2px}
+.maintenance-forecast{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#536e64;font-size:12px;margin-top:16px}
+.maintenance-forecast strong{font-size:15px;font-variant-numeric:tabular-nums;color:#264e40}
+.maintenance-condition{height:10px;margin-top:8px;background:#e1e8e5;border-radius:20px;overflow:hidden}
+.maintenance-condition i{display:block;height:100%;background:linear-gradient(90deg,#d77964,#e2c968,#4ca88c);border-radius:20px}
+.finance-explainer{margin-top:12px;font-size:11px;line-height:1.75;color:#647e73}
+@media(max-width:760px){.maintenance-options{grid-template-columns:1fr}.maintenance-option{padding:11px}.maintenance-forecast{align-items:flex-start}}

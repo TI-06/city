@@ -105,3 +105,23 @@ test('residential demand dashboard explains actual occupancy and rent on desktop
   await expect(page.locator('.housing-advice')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('maintenance strategy changes finance expenditure and survives save/reload',async ({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'財政と経済'}).click();
+  await expect(page.getByText('インフラ更新予算')).toBeVisible();
+  await expect(page.getByRole('meter',{name:'施設健全度'})).toBeVisible();
+  const minimum=page.getByRole('button',{name:/最低限の維持/});
+  await minimum.click();
+  await expect(minimum).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByText('次月の修繕積み残し見込み')).toBeVisible();
+  await page.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(page.getByText('手動保存完了')).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'財政と経済'}).click();
+  await expect(page.getByRole('button',{name:/最低限の維持/})).toHaveAttribute('aria-pressed','true');
+  expect(errors).toEqual([]);
+});
