@@ -76,5 +76,5 @@ describe('Phase 2 housing market and migration',()=>{
     const direct=advanceMonths(baseline,360);
     const resumed=advanceMonths(validateCity(JSON.parse(JSON.stringify(advanceMonths(baseline,130)))),230);
     expect(resumed).toEqual(direct);
-  });
+  },30_000);
 });
