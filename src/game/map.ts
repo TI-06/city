@@ -228,7 +228,11 @@ export type MapController = {
 };
 export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:readonly TilePoint[])=>void):Promise<MapController>{
   const app=new Application();
-  await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2)});
+  const mobileCanvas=window.innerWidth<700;
+  await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',
+    resolution:Math.min(window.devicePixelRatio||1,mobileCanvas?1.5:2)});
+  // Avoid 60 high-cost full-stage renders each second for a slowly moving city.
+  app.ticker.maxFPS=30;
   const stage=new Container();
   const terrain=new Graphics(),structures=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
   stage.addChild(terrain,structures,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
@@ -254,7 +258,15 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     const worldX=(cx-panX)/zoom,worldY=(cy-panY)/zoom;
     panX=cx-worldX*next;panY=cy-worldY*next;zoom=next;updateCamera();
   };
-  renderTerrain(terrain,city);renderStructures(structures,city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);resetView();
+  renderTerrain(terrain,city);
+  // The 4096-cell landscape changes only on a new map/import. Rasterize once
+  // at bounded scale to avoid tessellating thousands of diamonds each frame.
+  // Mobile retains a lower-resolution terrain cache for texture-memory safety.
+  terrain.cacheAsTexture({resolution:mobileCanvas?0.65:0.9,antialias:false});
+  renderStructures(structures,city);
+  if(motionEnabled)renderAmbient(ambient,scene,animationTime);
+  renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);
+  resetView();
   let down:{pointer:number;originX:number;originY:number;panX:number;panY:number;action:'pan'|'paint';path:TilePoint[];moved:boolean}|null=null;
   const point=(e:PointerEvent)=>hitTile(app.canvas,e.clientX,e.clientY,panX,panY,zoom);
   const local=(e:PointerEvent|WheelEvent)=>{const r=app.canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
@@ -306,7 +318,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
-      city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
+      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
       if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
