@@ -59,7 +59,7 @@ export function App(){
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const [mapQuickOpen,setMapQuickOpen]=useState(false);
   const [operationsOpen,setOperationsOpen]=useState(false);
-  const [operationsTab,setOperationsTab]=useState<'policy'|'tax'|'invest'|'roads'>('policy');
+  const [operationsTab,setOperationsTab]=useState<'policy'|'tax'|'invest'|'budget'|'roads'>('policy');
   const [mapQuickGroup,setMapQuickGroup]=useState<BuildGroup>('zones');
   const [selected,setSelected]=useState<{x:number;y:number}|null>(null);
   const selectedRef=useRef<{x:number;y:number}|null>(null);selectedRef.current=selected;
@@ -295,7 +295,7 @@ export function App(){
             {operationsOpen&&<div className="map-operations-body">
               <div className="map-operations-summary"><b>市の収支 {shortMoney(stats.balance)}/月</b><span>満足度 {stats.happiness} / 100</span></div>
               <div className="map-operations-tabs" role="group" aria-label="都市運営コマンド">
-                {([{id:'policy',label:'市政'},{id:'tax',label:'税率'},{id:'invest',label:'投資'},{id:'roads',label:'交通'}] as const).map(item=><button key={item.id}
+                {([{id:'policy',label:'市政'},{id:'tax',label:'税率'},{id:'invest',label:'投資'},{id:'budget',label:'予算'},{id:'roads',label:'交通'}] as const).map(item=><button key={item.id}
                   className={operationsTab===item.id?'selected':''} aria-pressed={operationsTab===item.id} onClick={()=>setOperationsTab(item.id)}>{item.label}</button>)}
               </div>
               {operationsTab==='policy'&&<div className="map-policy-options" role="group" aria-label="地図上の市政方針">
@@ -310,6 +310,26 @@ export function App(){
                   disabled={capitalNextCost(city,kind)===undefined||city.funds<(capitalNextCost(city,kind)??Infinity)}
                   onClick={()=>invest(kind)}><b>{CAPITAL_LABELS[kind]} Lv.{capitalLevel(city,kind)}</b>
                   <span>{capitalNextCost(city,kind)===undefined?'整備完了':`${format(capitalNextCost(city,kind)!)} Cで強化`}</span></button>)}
+              </div>}
+              {operationsTab==='budget'&&<div className="map-budget-controls">
+                <div className="map-budget-condition"><span>施設の健全度 <strong>{stats.infrastructureCondition}/100</strong></span>
+                  <span>修繕積み残し <strong>{format(stats.maintenanceBacklog)} C</strong></span></div>
+                <div role="group" aria-label="地図上の保全計画" className="map-budget-options">
+                  {(['minimum','standard','preventive'] as const).map(plan=>
+                    <button key={plan} aria-pressed={stats.maintenancePlan===plan}
+                      className={stats.maintenancePlan===plan?'selected':''}
+                      onClick={()=>applyMaintenance(plan)}>{MAINTENANCE_LABELS[plan]}</button>)}
+                </div>
+                <div className="map-budget-condition"><span>市債残高 <strong>{format(stats.outstandingDebt)} C</strong></span>
+                  <span>毎月返済 <strong>{format(stats.debtService)} C</strong></span></div>
+                <div role="group" aria-label="地図上の財政運営" className="map-budget-options">
+                  <button aria-pressed={stats.fiscalMode==='normal'} className={stats.fiscalMode==='normal'?'selected':''}
+                    onClick={()=>setFiscalMode('normal')}>通常運営</button>
+                  <button aria-pressed={stats.fiscalMode==='austerity'} className={stats.fiscalMode==='austerity'?'selected':''}
+                    onClick={()=>setFiscalMode('austerity')}>支出抑制</button>
+                </div>
+                <button className="map-budget-borrow" type="button" disabled={stats.debtHeadroom<BOND_AMOUNT}
+                  onClick={borrow}>市債で {format(BOND_AMOUNT)} C を調達</button>
               </div>}
               {operationsTab==='roads'&&<div className="map-traffic-quick" role="group" aria-label="簡易交通分析">
                 <span>推定混雑度 <b>{stats.congestion}%</b></span><span>混雑道路 <b>{stats.congestedRoads}区画</b></span>
