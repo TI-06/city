@@ -17,6 +17,7 @@ function testTown(roadCells: readonly [number, number][], residents = 100, jobs 
 describe('Phase 2 aggregate road connectivity and congestion', () => {
   it('treats a road-disconnected workplace as unreachable, regardless of citywide vacant jobs', () => {
     const disconnected = testTown([[10, 10], [20, 10]]);
+    expect(analyzeTraffic(disconnected).roadVolume).toHaveLength(SIZE * SIZE);
     expect(analyzeTraffic(disconnected).roadComponents).toBe(2);
     expect(getStats(disconnected).employed).toBe(0);
     expect(getStats(disconnected).vacancies).toBe(20);
