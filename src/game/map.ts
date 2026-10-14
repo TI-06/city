@@ -6,6 +6,7 @@ import { canPlaceAt, type City, type Building, type Tool, SIZE, tileIndex } from
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { analyzeLand } from '../core/land';
 import {getBuildingStyle} from './building-style';
+import {constructionPhase,constructionProgress,type ConstructionSite} from '../core/construction';
 import { appendLine, canDragPaint, insideTile, type InteractionMode, type TilePoint } from '../core/paint';
 
 const HW = 26;
@@ -131,6 +132,42 @@ function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,de
     }
   }
 }
+/** A construction site stays on the map for entire game months.
+ * The silhouette and stage depend on the saved month, not frame animation.
+ */
+function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail){
+  const p=tilePosition(site.x,site.y),t=constructionProgress(site,city.month);
+  const phase=constructionPhase(site,city.month);
+  const target:Building={id:site.id,x:site.x,y:site.y,kind:site.kind,level:site.level,residents:0,jobs:0};
+  const old=site.upgradeFrom===undefined?0:getBuildingStyle({...target,level:site.upgradeFrom},city.seed).height;
+  const desired=getBuildingStyle(target,city.seed).height;
+  const heightRatio=Math.min(.98,Math.max(old/desired,(site.upgradeFrom?old/desired:.12)+t*(1-old/desired)));
+  diamond(g,p.x,p.y,0xc99e68,.62);
+  if(phase==='foundation'&&site.upgradeFrom===undefined){
+    g.poly([p.x-16,p.y+HH,p.x,p.y+HH-9,p.x+16,p.y+HH,p.x,p.y+HH+9])
+      .stroke({color:0xf9e1a6,width:2.7,alpha:.92});
+    g.moveTo(p.x-9,p.y+HH-2).lineTo(p.x+9,p.y+HH+2)
+      .stroke({color:0x8d654a,width:1.5});
+  }else{
+    drawCityBuilding(g,p.x,p.y,target,city.seed,detail,heightRatio);
+  }
+  // Site fence, crane and visible month-progress bar.
+  const top=p.y+10-Math.max(9,desired*heightRatio);
+  g.moveTo(p.x-20,p.y+HH+12).lineTo(p.x-20,top-5)
+    .lineTo(p.x+19,top-5).lineTo(p.x+19,p.y+HH+12)
+    .stroke({color:0xf5bc62,width:1.6,alpha:.9});
+  g.moveTo(p.x-20,p.y+HH+4).lineTo(p.x+19,p.y+HH+4)
+    .stroke({color:0xe1b477,width:1.4,alpha:.75});
+  g.moveTo(p.x+19,top-11).lineTo(p.x-7,top-11).stroke({color:0xfce1a3,width:2.4});
+  g.moveTo(p.x-4,top-11).lineTo(p.x-4,top+1).stroke({color:0xb59b75,width:1.1});
+  const barX=p.x-15,barY=p.y+HH*2+10;
+  g.roundRect(barX,barY,30,5,2).fill(0x284d42);
+  g.roundRect(barX,barY,Math.max(2,30*t),5,2).fill(0xffcc70);
+  if(detail==='detail'){
+    g.circle(p.x-16,p.y+HH+11,2).fill(0xe6dbb3);
+    g.circle(p.x+17,p.y+HH+11,2).fill(0xe6dbb3);
+  }
+}
 function renderTerrain(g:Graphics,city:City){
   g.clear();
   for(let sum=0;sum<2*SIZE-1;sum++)for(let y=Math.max(0,sum-SIZE+1);y<=Math.min(SIZE-1,sum);y++){
@@ -152,16 +189,17 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
   let renderedTiles=0;
   const buildings=new Map(city.buildings.map(b=>[tileIndex(b.x,b.y),b]));
   const services=new Map(city.services.map(s=>[tileIndex(s.x,s.y),s]));
+  const sites=new Map((city.construction??[]).map(site=>[tileIndex(site.x,site.y),site]));
   for(let sum=window.minX+window.minY;sum<=window.maxX+window.maxY;sum++)
     for(let y=Math.max(window.minY,sum-window.maxX);y<=Math.min(window.maxY,sum-window.minX);y++){
     const x=sum-y,i=tileIndex(x,y);
     if(!tileNearViewport(x,y,viewport.width,viewport.height,viewport.panX,viewport.panY,viewport.zoom))continue;
     renderedTiles++;
     if(city.land[i]===0)continue;
-    const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i);
+    const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i),site=sites.get(i);
     if(city.zones[i]){
       diamond(g,p.x,p.y,COVERAGE[city.zones[i]!]!,0.42);
-      if(!b){
+      if(!b&&!site){
         // Vacant zoned land has a visible foundation even at overview zoom:
         // a zoned lot is NOT an already built home/shop/factory.
         g.poly([p.x-12,p.y+HH,p.x,p.y+HH-6,p.x+12,p.y+HH,p.x,p.y+HH+6])
@@ -186,7 +224,9 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
       if(city.roads[i]===2){g.circle(p.x-9,p.y+HH-4,2).fill(0xffe8a8);g.circle(p.x+9,p.y+HH+4,2).fill(0xffe8a8);}
       }
     }
-    if(b){
+    if(site){
+      renderWorkSite(g,city,site,detail);
+    }else if(b){
       if(!constructionTiles.has(i))drawCityBuilding(g,p.x,p.y,b,city.seed,detail);
     } else if(s){
       if(s.kind==='park'){
@@ -303,60 +343,17 @@ function renderCityEffects(g:Graphics,city:City,mood:CityMood,pulses:readonly Gr
   for(const pulse of pulses){
     const age=time-pulse.createdAt;
     if(age<0||age>=CONSTRUCTION_SECONDS)continue;
-    const t=age/CONSTRUCTION_SECONDS;
-    const phase=constructionStage(age);
-    const pt=tilePosition(pulse.x,pulse.y);
-    const color=pulse.kind==='upgrade'?0xffdf81:pulse.kind==='service'?0x83e4ee:0xa3e9ba;
-    if(pulse.kind==='service'){
-      const radius=5+22*t;
-      g.circle(pt.x,pt.y-10,radius).stroke({width:2.5,color,alpha:.7*(1-t)});
-      continue;
-    }
-    const building=city.buildings.find(b=>b.x===pulse.x&&b.y===pulse.y);
-    if(!building)continue;
-    // Stage 1 — groundwork: a visible excavation, stakes and site dust.
-    if(phase==='foundation'){
-      const reveal=Math.min(1,t/.22);
-      diamond(g,pt.x,pt.y,0xb28f64,.75);
-      g.poly([pt.x-15,pt.y+HH,pt.x,pt.y+HH-8,pt.x+15,pt.y+HH,pt.x,pt.y+HH+8])
-        .stroke({width:2.3,color:0xffd58c,alpha:.9});
-      for(const d of [-1,1]){
-        g.circle(pt.x+d*13,pt.y+HH+3-reveal*4,3+reveal*3)
-          .fill({color:0xded3b5,alpha:.36*(1-reveal*.5)});
-      }
-      continue;
-    }
-    // Stage 2 — the masonry rises from the foundation while a temporary
-    // scaffold and crane mark the building as under construction.
-    const rise=phase==='frame'?Math.max(.12,(t-.22)/.55):1;
-    drawCityBuilding(g,pt.x,pt.y,building,city.seed,'overview',rise);
-    if(phase==='frame'){
-      const h=getBuildingStyle(building,city.seed).height*rise;
-      const top=pt.y+7-h;
-      g.moveTo(pt.x-17,pt.y+HH+10).lineTo(pt.x-17,top)
-        .lineTo(pt.x+17,top).lineTo(pt.x+17,pt.y+HH+10)
-        .stroke({width:1.7,color:0xedbb67,alpha:.83});
-      for(let i=0;i<4;i++){
-        const yy=pt.y+HH+9-i*h/4;
-        g.moveTo(pt.x-17,yy).lineTo(pt.x+17,yy)
-          .stroke({width:1.1,color:0xffdea0,alpha:.72});
-      }
-      const sway=Math.sin(age*2)*4;
-      g.moveTo(pt.x+17,top-8).lineTo(pt.x-6,top-8)
-        .stroke({width:2,color:0xf8d183});
-      g.moveTo(pt.x-5,top-8).lineTo(pt.x-5+sway,top+7)
-        .stroke({width:1,color:0xb8a78d});
-      g.circle(pt.x+12,pt.y+HH+5,4).fill({color:0xe7d1a3,alpha:.33});
-    } else {
-      // Stage 3 — finish details and a short one-off completion sparkle.
-      drawCityBuilding(g,pt.x,pt.y,building,city.seed,'detail',1);
-      const fade=Math.max(0,(CONSTRUCTION_SECONDS-age)/(.23*CONSTRUCTION_SECONDS));
-      const sparkleY=pt.y-getBuildingStyle(building,city.seed).height-6;
-      for(let i=0;i<4;i++){
-        const angle=i*Math.PI/2+t*2;
-        const x=pt.x+Math.cos(angle)*(10+(1-fade)*12);
-        const y=sparkleY+Math.sin(angle)*(7+(1-fade)*8);
-        g.circle(x,y,2.4).fill({color,alpha:fade*.95});
+    // New building construction already happened over real game months.
+    // This temporary ring celebrates COMPLETION, never rebuilds it.
+    const p=tilePosition(pulse.x,pulse.y),t=age/CONSTRUCTION_SECONDS;
+    const color=pulse.kind==='upgrade'?0xffe08d:pulse.kind==='service'?0x7de4de:0x91e9ae;
+    g.circle(p.x,p.y-20,8+t*19)
+      .stroke({color,width:2.5-t*1.5,alpha:.7*(1-t)});
+    if(t<.45){
+      for(let i=0;i<3;i++){
+        const angle=i*Math.PI*2/3+t*4;
+        g.circle(p.x+Math.cos(angle)*(10+t*12),p.y-25+Math.sin(angle)*(8+t*12),2.5)
+          .fill({color,alpha:1-t*2});
       }
     }
   }
@@ -450,7 +447,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     renderedWindow=paddedTileWindow(visible,8);
     renderedDetail=detail;
     renderedZoom=zoom;
-    const hidden=new Set(pulses.filter(p=>p.kind!=='service').map(p=>tileIndex(p.x,p.y)));
+    const hidden=new Set<number>();
     const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},hidden);
     structureBuilds++;
