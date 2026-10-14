@@ -1,10 +1,10 @@
 /** All game logic is deterministic and independent of the renderer and browser storage. */
-import { analyzeTraffic, ROAD_CAPACITY } from './traffic';
+import { analyzeTraffic, getRoadCapacity } from './traffic';
 import { SIZE } from './grid';
 export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
 export type Zone = 0 | 1 | 2 | 3;
-export type Tool = 'inspect' | 'road' | 'home' | 'shop' | 'industry' | 'park' | 'school' | 'clinic' | 'bulldoze';
+export type Tool = 'inspect' | 'road' | 'arterial' | 'home' | 'shop' | 'industry' | 'park' | 'school' | 'clinic' | 'bulldoze';
 export type Policy = 'balanced' | 'growth' | 'eco' | 'mobility';
 export type Building = { id: number; x: number; y: number; kind: Exclude<Zone, 0>; level: number; residents: number; jobs: number };
 export type Service = { id: number; x: number; y: number; kind: 'park' | 'school' | 'clinic' };
@@ -14,9 +14,9 @@ export type City = {
   land: number[]; roads: number[]; zones: number[]; buildings: Building[]; services: Service[];
   nextId: number; history: History[]; paused: boolean; speed: 1 | 2 | 4;
 };
-export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number };
+export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; arterialRoads: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number };
 
-const COST: Record<Tool, number> = { inspect: 0, road: 65, home: 12, shop: 12, industry: 12, park: 750, school: 2900, clinic: 4200, bulldoze: 90 };
+const COST: Record<Tool, number> = { inspect: 0, road: 65, arterial: 420, home: 12, shop: 12, industry: 12, park: 750, school: 2900, clinic: 4200, bulldoze: 90 };
 export const COSTS = COST;
 export const SERVICE_COST: Record<Service['kind'], number> = { park: 18, school: 95, clinic: 145 };
 export const POLICY_LABELS: Record<Policy, string> = { balanced: '均衡発展', growth: '産業振興', eco: '環境優先', mobility: '公共交通重視' };
@@ -24,14 +24,14 @@ const idx = (x: number, y: number) => y * SIZE + x;
 export const inside = (x: number, y: number) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < SIZE && y < SIZE;
 const seeded = (v: number) => ((v ^ (v >>> 16)) * 2246822519) >>> 0;
 const stepRandom = (city: City) => { city.random = (Math.imul(city.random, 1664525) + 1013904223) >>> 0; return city.random / 4294967296; };
-const adjacent = (city: City, x: number, y: number) => [[x-1,y],[x+1,y],[x,y-1],[x,y+1]].some(([a,b]) => inside(a!,b!) && city.roads[idx(a!,b!)] === 1);
+const adjacent = (city: City, x: number, y: number) => [[x-1,y],[x+1,y],[x,y-1],[x,y+1]].some(([a,b]) => inside(a!,b!) && (city.roads[idx(a!,b!)]??0)>0);
 const landAt = (city: City,x:number,y:number) => inside(x,y) && city.land[idx(x,y)] !== 0;
 const buildingAt = (city: City,x:number,y:number) => city.buildings.find(b=>b.x===x && b.y===y);
 const serviceAt = (city: City,x:number,y:number) => city.services.find(s=>s.x===x && s.y===y);
 export const tileIndex = idx;
 export const zoneNames = ['', '住宅', '商業', '工業'];
 const serviceNames: Record<Service['kind'],string> = { park:'公園',school:'学校',clinic:'診療所' };
-export const toolNames: Record<Tool,string> = {inspect:'調査',road:'道路',home:'住宅地区',shop:'商業地区',industry:'工業地区',park:'公園',school:'学校',clinic:'診療所',bulldoze:'撤去'};
+export const toolNames: Record<Tool,string> = {inspect:'調査',road:'道路',arterial:'幹線道路',home:'住宅地区',shop:'商業地区',industry:'工業地区',park:'公園',school:'学校',clinic:'診療所',bulldoze:'撤去'};
 
 export function createCity(name = 'みどり野市', seed = 12937): City {
   const land = Array.from({length:SIZE*SIZE}, (_, n) => {
@@ -68,7 +68,8 @@ export function getStats(city:City):Stats {
   const employed=Math.min(labor,jobs,traffic.employed);
   const commerce=city.buildings.filter(b=>b.kind===2).length;
   const industry=city.buildings.filter(b=>b.kind===3).length;
-  const roads=city.roads.reduce((n,v)=>n+(v===1?1:0),0);
+  const roads=city.roads.reduce((n,v)=>n+(v>0?1:0),0);
+  const arterialRoads=city.roads.reduce((n,v)=>n+(v===2?1:0),0);
   const green=city.services.filter(s=>s.kind==='park').length;
   const vacancies=Math.max(0,jobs-employed);
   const access=Math.min(16,city.services.filter(s=>s.kind!=='park').length*5);
@@ -79,8 +80,8 @@ export function getStats(city:City):Stats {
   const enterpriseFactor=city.policy==='growth'?1.22:city.policy==='eco'?0.9:1;
   const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor*traffic.productivity);
   const transportProgram=city.policy==='mobility'?90+population*0.14:0;
-  const expenses=Math.round(roads*0.85+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85+transportProgram);
-  return {population,jobs,employed,vacancies,happiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity};
+  const expenses=Math.round((roads-arterialRoads)*0.85+arterialRoads*3.25+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85+transportProgram);
+  return {population,jobs,employed,vacancies,happiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,arterialRoads,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity};
 }
 const historyEntry=(city:City):History=>{const s=getStats(city);return {month:city.month,population:s.population,funds:city.funds,income:s.income,expense:s.expenses,happiness:s.happiness};};
 export type CommandResult = {ok:true;changed:boolean;message:string;city:City}|{ok:false;changed:false;message:string;city:City};
@@ -94,6 +95,12 @@ export function applyTool(current: City,tool:Tool,x:number,y:number):CommandResu
     if(current.funds<COST.bulldoze)return {ok:false,changed:false,message:'撤去資金が足りません',city:current};
     const city=structuredClone(current);city.funds-=COST.bulldoze;city.roads[i]=0;city.zones[i]=0;city.buildings=city.buildings.filter(b=>b.x!==x||b.y!==y);city.services=city.services.filter(s=>s.x!==x||s.y!==y);
     return {ok:true,changed:true,message:'撤去しました',city};
+  }
+  if(tool==='arterial'){
+    if(current.roads[i]!==1)return {ok:false,changed:false,message:'一般道路だけ幹線道路に改良できます',city:current};
+    if(current.funds<COST.arterial)return {ok:false,changed:false,message:'幹線道路の改良資金が足りません',city:current};
+    const city=structuredClone(current);city.roads[i]=2;city.funds-=COST.arterial;
+    return {ok:true,changed:true,message:'幹線道路に改良しました',city};
   }
   if(!landAt(current,x,y))return {ok:false,changed:false,message:'水域には建設できません',city:current};
   if(current.roads[i]||current.zones[i]||currentBuilding||currentService)return {ok:false,changed:false,message:'すでに建物・地区・道路があります',city:current};
@@ -138,6 +145,11 @@ export function applyStroke(current: City, tool: Tool, points: readonly Readonly
       applied++;
       continue;
     }
+    if(tool==='arterial'){
+      if(next.roads[i]!==1){skipped++;lastReason='一般道路だけ幹線道路に改良できます';continue;}
+      if(next.funds<COST.arterial){skipped++;lastReason='改良資金が足りません';continue;}
+      next.roads[i]=2;next.funds-=COST.arterial;applied++;continue;
+    }
     if (!landAt(next,x,y)) {skipped++;lastReason='水域には建設できません';continue;}
     if (exists) {skipped++;lastReason='すでに建物・地区・道路があります';continue;}
     if (tool!=='road'&&!adjacent(next,x,y)) {skipped++;lastReason='道路に接する土地を選択してください';continue;}
@@ -160,6 +172,7 @@ export function canPlaceAt(city:City,tool:Tool,x:number,y:number):boolean {
   const i=idx(x,y);
   const occupied=Boolean(city.roads[i]||city.zones[i]||buildingAt(city,x,y)||serviceAt(city,x,y));
   if(tool==='bulldoze')return occupied&&city.funds>=COST.bulldoze;
+  if(tool==='arterial')return city.roads[i]===1 && city.funds>=COST.arterial;
   if(!landAt(city,x,y)||occupied||city.funds<COST[tool])return false;
   return tool==='road'||adjacent(city,x,y);
 }
@@ -167,7 +180,7 @@ export function canPlaceAt(city:City,tool:Tool,x:number,y:number):boolean {
 export function describeTile(city:City,x:number,y:number):string{
   if(!inside(x,y))return '';
   if(city.land[idx(x,y)]===0)return '川・水域';
-  if(city.roads[idx(x,y)]){const load=Math.round(analyzeTraffic(city).roadVolume[idx(x,y)]??0);return `道路：推定交通負荷 ${load} / 基準容量 ${ROAD_CAPACITY}${load>ROAD_CAPACITY?'（混雑）':''}`;}
+  if(city.roads[idx(x,y)]){const load=Math.round(analyzeTraffic(city).roadVolume[idx(x,y)]??0);const capacity=getRoadCapacity(city.roads[idx(x,y)]!);return `${city.roads[idx(x,y)]===2?'幹線道路':'一般道路'}：推定交通負荷 ${load} / 容量 ${capacity}${load>capacity?'（混雑）':''}`;}
   const s=serviceAt(city,x,y);if(s)return `${serviceNames[s.kind]}：運営中`;
   const b=buildingAt(city,x,y);if(b)return `${zoneNames[b.kind]}建物 Lv.${b.level} ／ 居住 ${b.residents}人 ／ 雇用 ${b.jobs}人`;
   return city.zones[idx(x,y)]?`${zoneNames[city.zones[idx(x,y)]!]}地区：開発待ち`:'空き地：開発できます';
@@ -214,6 +227,6 @@ export function validateCity(candidate:unknown):City{
   const occupied=new Set<number>(),ids=new Set<number>();
   for(const b of c.buildings){if(!inside(b.x,b.y)||!Number.isInteger(b.id)||!Number.isInteger(b.level)||b.level<1||b.level>3||![1,2,3].includes(b.kind)||!Number.isSafeInteger(b.residents)||!Number.isSafeInteger(b.jobs))throw new Error('建物情報が無効です');const i=idx(b.x,b.y);if(occupied.has(i)||ids.has(b.id))throw new Error('建物が重複しています');occupied.add(i);ids.add(b.id);}
   for(const s of c.services){if(!inside(s.x,s.y)||!['park','school','clinic'].includes(s.kind)||!Number.isInteger(s.id))throw new Error('公共施設情報が無効です');const i=idx(s.x,s.y);if(occupied.has(i)||ids.has(s.id))throw new Error('公共施設が重複しています');occupied.add(i);ids.add(s.id);}
-  for(let i=0;i<c.land.length;i++){if(![0,1].includes(c.land[i]!)||![0,1].includes(c.roads[i]!)||![0,1,2,3].includes(c.zones[i]!))throw new Error('マップデータが不正です'); if((c.roads[i]&&c.zones[i])||(occupied.has(i)&&c.roads[i])||(c.services.some(s=>idx(s.x,s.y)===i)&&c.zones[i]))throw new Error('マップの配置情報が重複しています');}
+  for(let i=0;i<c.land.length;i++){if(![0,1].includes(c.land[i]!)||![0,1,2].includes(c.roads[i]!)||![0,1,2,3].includes(c.zones[i]!))throw new Error('マップデータが不正です'); if((c.roads[i]&&c.zones[i])||(occupied.has(i)&&c.roads[i])||(c.services.some(s=>idx(s.x,s.y)===i)&&c.zones[i]))throw new Error('マップの配置情報が重複しています');}
   return c as City;
 }

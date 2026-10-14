@@ -8,6 +8,7 @@ type Menu='build'|'finance'|'traffic'|'residents'|'policy';
 const palettes: {tool:Tool; icon:string; hint:string}[] = [
   {tool:'inspect',icon:'⌖',hint:'土地を調べる'},
   {tool:'road',icon:'═',hint:'道路を建設'},
+  {tool:'arterial',icon:'≡',hint:'一般道路を幹線道路へ改良（容量85→220、維持費増）'},
   {tool:'home',icon:'⌂',hint:'住宅地区'},
   {tool:'shop',icon:'▤',hint:'商業地区'},
   {tool:'industry',icon:'▥',hint:'工業地区'},
@@ -133,12 +134,13 @@ export function App(){
             <div><small>平均通勤距離</small><b>{stats.averageCommute.toFixed(1)} 区画</b></div>
             <div><small>交通による企業生産効率</small><b>{Math.round(stats.trafficProductivity*100)}%</b></div>
             <div><small>道路ネットワーク</small><b>{format(stats.roadComponents)} 系統</b></div>
+            <div><small>幹線道路に改良済み</small><b>{format(stats.arterialRoads)} マス</b></div>
             <div><small>通勤先がない・道路未接続の住民</small><b>{format(stats.disconnectedResidents)} 人</b></div>
           </div>
           <div className="traffic-meter-label"><span>都市の交通混雑</span><b>{stats.congestion}%</b></div>
           <div className="traffic-progress" role="meter" aria-label="推定混雑度" aria-valuenow={stats.congestion} aria-valuemin={0} aria-valuemax={100}><i style={{width:`${stats.congestion}%`}}/></div>
           <div className="traffic-advice">{stats.employed===0?'就業者がいません。住宅と職場を道路でつなぎ、雇用を増やしましょう。':stats.congestion>45?'交通が集中しています。職場と住宅を分散させ、別の道路ネットワークで混雑を軽減しましょう。':stats.congestion>20?'交通に負荷がかかっています。マップ上の橙・赤色の道路を確認しましょう。':'通勤路の混雑は小さい状態です。新しい開発地区と職場の接続を確認しましょう。'}</div>
-          <p className="traffic-note">混雑は1マスの道路容量85を基準にした簡易推計です。車両の個別走行や交差点制御はまだ導入していません。</p>
+          <p className="traffic-note">一般道路の容量は85、幹線道路は220。幹線道路は1マス420 Cの改良費と追加維持費がかかります。交差点制御や迂回行動は未導入です。</p>
         </div>}
         {active==='finance'&&<div className="data-panel"><div className="panel-title"><strong>財政と経済</strong><span>都市の収入・支出を確認</span></div><div className="metric-grid"><div><small>税収・企業収入</small><b className="positive">+{format(stats.income)} C / 月</b></div><div><small>維持・公共サービス費</small><b className="negative">−{format(stats.expenses)} C / 月</b></div><div><small>就業者数</small><b>{format(stats.employed)} 人</b></div><div><small>商業 / 工業</small><b>{stats.commerce} / {stats.industry} 棟</b></div></div><div className="control-row"><label htmlFor="tax">住民税率 <strong>{city.tax}%</strong></label><input id="tax" type="range" min="3" max="18" value={city.tax} onChange={e=>applyTax(Number(e.target.value))}/></div></div>}
         {active==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div></div></div>}
@@ -148,6 +150,6 @@ export function App(){
         <div className="inspector-foot"><button onClick={()=>exportCity(city)}>都市データを書き出す ↗</button><button onClick={()=>importRef.current?.click()}>データを読み込む ↥</button><button onClick={()=>{void restoreBackup();}}>前回のバックアップを復元 ↶</button><input ref={importRef} type="file" accept=".json,application/json" hidden onChange={e=>{void doImport(e.currentTarget.files?.[0]);e.currentTarget.value='';}}/><button className="new-game" onClick={()=>{if(window.confirm('現在の都市を新規作成しますか？ 自動保存は上書きされます。')){const next=createCity();editedRef.current=true;setCity(next);cityRef.current=next;setSelected(null);undoRef.current=null;setCanUndo(false);setMode('pan');setTool('inspect');void saveCity(next);setMessage('新しい都市を作りました');}}}>新しい都市を始める</button></div></aside>
       </div>
     </section>
-    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去は「描く」モードでドラッグすると連続操作できます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
+    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
   </main>;
 }
