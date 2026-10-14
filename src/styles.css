@@ -264,3 +264,11 @@
   .app-shell:not([data-active-menu="build"]) .city-growth-moment{bottom:calc(80px + env(safe-area-inset-bottom))}
 }
 @media(prefers-reduced-motion:reduce){.city-growth-moment{animation:none}}
+
+/* Fix flex cross-axis sizing on Pixel-sized screens: desktop align-items:start
+ * must not collapse the canvas-containing main column to intrinsic height. */
+@media(max-width:700px){
+ .content-area{align-items:stretch!important}
+ .main-panel{height:100%;min-height:0;align-self:stretch}
+ .map-host{flex:1 1 0%;min-height:0!important}
+}
