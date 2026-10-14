@@ -2,16 +2,15 @@ import { Application, Container, Graphics, type Ticker } from 'pixi.js';
 import { buildAmbientScene, sampleVehicle, sampleWalker, nightLevel, type AmbientScene } from './ambient';
 import {visibleTileWindow,paddedTileWindow,needsTileWindowRefresh,structureDetailAtZoom,tileNearViewport,type TileWindow,type StructureDetail} from './viewport';
 import {appendGrowthPulses,detectGrowthEvents,visualMood,type CityMood,type GrowthPulse} from './visual-state';
-import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
+import { canPlaceAt, type City, type Building, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { analyzeLand } from '../core/land';
+import {getBuildingStyle} from './building-style';
 import { appendLine, canDragPaint, insideTile, type InteractionMode, type TilePoint } from '../core/paint';
 
 const HW = 26;
 const HH = 13;
 const GROUND = [0x84bb77, 0x8bc480, 0x7caf74, 0x92c686, 0x83b974];
-const ROOFS = [0, 0xe9b27a, 0x8cb7c4, 0xb6a5a0];
-const WALLS = [0, 0xf1dcc3, 0xdce9e6, 0xc4b8b0];
 const COVERAGE = [0, 0xcceaaa, 0x92d6cf, 0xe6bb9d];
 const SERVICE_COLORS = {park:0x5d9862,school:0xe8bd70,clinic:0xe6e7e0};
 const tilePosition = (x:number,y:number)=>({x:(x-y)*HW,y:(x+y)*HH});
@@ -53,6 +52,79 @@ function buildingBox(g:Graphics,x:number,y:number,h:number,top:number,left:numbe
       const xx=x+3+col*7;
       g.poly([xx,yy,xx+4,yy-2,xx+4,yy+3,xx,yy+5]).fill({color:0x6996ab,alpha:.92});
       g.poly([x-16+col*7,yy-8,x-12+col*7,yy-6,x-12+col*7,yy-2,x-16+col*7,yy-4]).fill({color:0xf3e4c9,alpha:.78});
+    }
+  }
+}
+/** Draw distinct skylines per district and level; only derived building geometry.
+ * Details are omitted at overview zoom for mobile GPU budgets.
+ */
+function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,detail:StructureDetail){
+  const design=getBuildingStyle(b,seed),h=design.height;
+  const roofline=y-h+5;
+  const isHome=b.kind===1;
+  const fittedVariant=isHome&&(design.silhouette==='pitched'||design.name==='townhouse')?1:b.kind===3?3:2;
+  buildingBox(g,x,y,h,design.roof,design.left,design.right,fittedVariant,detail);
+  if(design.silhouette==='pitched'){
+    // Raised ridge, chimney and porch visually distinguish small homes.
+    g.moveTo(x-18,y+HH-h+6).lineTo(x,y-h+3).lineTo(x+18,y+HH-h+6)
+      .stroke({color:0xffe4af,width:2.1});
+    g.rect(x+8,roofline-10,4,11).fill(0xac7963);
+    g.poly([x+5,roofline-10,x+10,roofline-13,x+14,roofline-10,x+9,roofline-7]).fill(0x8f5d53);
+    if(detail==='detail'){
+      g.poly([x-7,y+HH*2+2,x,y+HH*2-1,x+5,y+HH*2+2,x-2,y+HH*2+5])
+        .fill(0xe8cd98);
+      g.circle(x-16,y+HH+12,3).fill(0x4b9460);
+    }
+    return;
+  }
+  if(design.silhouette==='terraced'){
+    // Lowrise apartment balconies and row-house roof stair.
+    g.rect(x-9,roofline-6,12,5).fill(0xb7c6bd);
+    if(detail==='detail'){
+      for(let floor=0;floor<Math.min(5,Math.floor(h/12));floor++){
+        const yy=y+HH+5-floor*10;
+        g.moveTo(x+1,yy+8).lineTo(x+15,yy+1).stroke({color:design.accent,width:2.2,alpha:.8});
+      }
+    }
+  } else if(design.silhouette==='tower'||design.silhouette==='glass'){
+    // A slender stepped rooftop silhouette is visible even on overview.
+    g.poly([x-9,roofline,x,roofline-6,x+9,roofline,x,roofline+5]).fill(design.accent);
+    g.rect(x-2,roofline-11,4,7).fill(0x708b99);
+    if(detail==='detail'){
+      for(let floor=1;floor<Math.min(7,Math.floor(h/11));floor++){
+        const yy=y+HH+5-floor*9;
+        g.poly([x+4,yy,x+11,yy-3,x+11,yy+1,x+4,yy+4])
+          .fill({color:0xb7e6f3,alpha:.83});
+        g.poly([x-14,yy-8,x-7,yy-5,x-7,yy-1,x-14,yy-4])
+          .fill({color:0x8bc3de,alpha:.8});
+      }
+    }
+  } else if(design.silhouette==='awning'){
+    // Retail shopfronts have prominent colorful awnings/signage.
+    g.poly([x+1,y+HH+2,x+19,y+HH-8,x+19,y+HH-3,x+1,y+HH+7])
+      .fill(design.accent);
+    g.rect(x-8,roofline-5,16,4).fill(design.accent);
+    if(detail==='detail'){
+      g.poly([x+3,y+HH+13,x+10,y+HH+10,x+10,y+HH+19,x+3,y+HH+22])
+        .fill(0x476f78);
+      g.circle(x+14,y+HH+5,2).fill(0xfff2bd);
+    }
+  } else if(design.silhouette==='shed'){
+    // Wide low industrial roof with sawtooth highlights.
+    g.poly([x-17,roofline+7,x-10,roofline-2,x-3,roofline+5,x+5,roofline-4,x+14,roofline+7])
+      .fill({color:design.accent,alpha:.85});
+    if(detail==='detail'){
+      g.rect(x+4,y+HH+8,9,10).fill(0x617782);
+      g.rect(x+6,y+HH+11,5,4).fill(0xc0d3ce);
+    }
+  } else if(design.silhouette==='industrial'){
+    // Smokestack plus rooftop tanks makes a recognizable industrial plant.
+    g.rect(x+13,roofline-21,6,26).fill(0x768a8c);
+    g.rect(x+12,roofline-22,8,4).fill(design.accent);
+    g.ellipse(x+16,roofline-22,4,2).fill(0xb3c6be);
+    if(detail==='detail'){
+      g.circle(x-8,roofline-2,5).fill(0x95a6a1);
+      g.rect(x-11,roofline-5,6,4).fill(0xbdd1ce);
     }
   }
 }
@@ -111,10 +183,7 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
       }
     }
     if(b){
-      const h=b.kind===1?13+b.level*7:b.kind===2?24+b.level*9:19+b.level*9;
-      const roof=ROOFS[b.kind]!+(v%3)*0x010101;
-      buildingBox(g,p.x,p.y,h,roof,WALLS[b.kind]!,b.kind===1?0xcba98c:b.kind===2?0x7ea5a5:0x9a8781,b.kind,detail);
-      if(b.kind===3&&detail==='detail'){g.rect(p.x+14,p.y-h-12,5,15).fill(0x889190);g.ellipse(p.x+16,p.y-h-16,6,3).fill({color:0xe2e6e0,alpha:.45});}
+      drawCityBuilding(g,p.x,p.y,b,city.seed,detail);
     } else if(s){
       if(s.kind==='park'){
         diamond(g,p.x,p.y,0x5e9c69);
