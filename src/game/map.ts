@@ -440,7 +440,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   };
   app.ticker.add(onAnimationFrame);
   let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
-  let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0;
+  let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0,structuresCached=false;
   const refreshVisibleStructures=(force=false)=>{
     const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
     const detail=structureDetailAtZoom(zoom);
@@ -454,6 +454,18 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},hidden);
     structureBuilds++;
+    // Buildings are immutable between player edits/month ticks. Rasterize the
+    // visible construction set once, then keep GPU draw cost constant between
+    // rebuilds. Never cache moving vehicles, people or construction scenes.
+    structures.visible=renderedTiles>0;
+    if(renderedTiles>0){
+      if(structuresCached)structures.updateCacheTexture();
+      else{
+        structures.cacheAsTexture({resolution:mobileCanvas?0.65:0.9,antialias:false});
+        structuresCached=true;
+      }
+    }
+    app.canvas.dataset.structureCached=String(structuresCached);
     app.canvas.dataset.structureTiles=String(renderedTiles);
     app.canvas.dataset.structureDetail=detail;
     app.canvas.dataset.structureBuilds=String(structureBuilds);
