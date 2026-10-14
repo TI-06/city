@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 async function openData(page:Page,name:'財政と経済'|'交通・物流'|'住民と人口'|'政策と行政'){
-  if(!await page.locator('.data-subnav').isVisible())await page.getByRole('button',{name:'都市データ'}).click();
+  if(!await page.locator('.data-subnav').isVisible())await page.getByRole('button',{name:'都市データ',exact:true}).click();
   await page.getByRole('navigation',{name:'都市データの切替'}).getByRole('button',{name}).click();
 }
 
