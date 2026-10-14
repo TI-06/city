@@ -49,7 +49,7 @@ export function assessHousing(
   // Jobs and city conditions create indicative pressure; not an actual waiting list.
   const targetResidents=Math.max(0,Math.round((jobSlots/0.53)*0.90*clamp(happiness/75,0.55,1.25)+25));
   const demandGap=Math.max(0,targetResidents-capacity);
-  const pressure=clamp(targetResidents/Math.max(1,capacity),0.65,1.75);
+  const pressure=clamp(0.6+0.43*Math.log1p(targetResidents/Math.max(1,capacity)),0.65,1.95);
   const estimatedRent=Math.round((2.5+averageHousingLand*0.035)*pressure*10)/10;
   // Explicit estimated non-wage household support avoids a zero-income divide.
   // Empty new towns have potential wage earners rather than zero-income tenants.
