@@ -8,6 +8,9 @@ test('map renders and editor controls work without runtime exceptions', async ({
   const canvas=page.locator('.map-host canvas');
   await expect(canvas).toBeVisible({timeout:30_000});
   await expect(page.locator('.map-status')).toContainText('マップ稼働中');
+  if(await page.getByRole('button',{name:'建設メニューを開く',exact:true}).isVisible()){
+    await page.getByRole('button',{name:'建設メニューを開く',exact:true}).click();
+  }
   if(await page.locator('.mobile-build-categories').isVisible()){
     await page.locator('.mobile-build-categories').getByRole('button',{name:/道路/}).click();
   }
@@ -72,6 +75,9 @@ test('arterial upgrade tool is available in the city map editor on mobile and de
   await page.goto('/');
   await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
   await page.getByRole('button',{name:'都市建設'}).click();
+  if(await page.getByRole('button',{name:'建設メニューを開く',exact:true}).isVisible()){
+    await page.getByRole('button',{name:'建設メニューを開く',exact:true}).click();
+  }
   if(await page.locator('.mobile-build-categories').isVisible()){
     await page.locator('.mobile-build-categories').getByRole('button',{name:/道路/}).click();
   }
