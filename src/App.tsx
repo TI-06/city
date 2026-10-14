@@ -45,6 +45,7 @@ export function App(){
   const [message,setMessage]=useState('道路を敷いたり、住宅地区を指定して街を育てましょう。');
   const [saveLabel,setSaveLabel]=useState('ローカル保存');
   const [ready,setReady]=useState(false);
+  const [motion,setMotion]=useState(()=>!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const [help,setHelp]=useState(false);
   const mapHost=useRef<HTMLDivElement>(null);const mapRef=useRef<MapController|null>(null);
   const importRef=useRef<HTMLInputElement>(null);
@@ -84,6 +85,7 @@ export function App(){
   useEffect(()=>{mapRef.current?.setCity(city);},[city]);
   useEffect(()=>{mapRef.current?.setSelected(selected,tool);},[selected,tool]);
   useEffect(()=>{mapRef.current?.setMode(mode);},[mode]);
+  useEffect(()=>{mapRef.current?.setMotion(motion);},[motion,ready]);
   useEffect(()=>{mapRef.current?.setTrafficView(active==='traffic');mapRef.current?.setLandView(active==='residents');},[active,ready]);
   useEffect(()=>{let cancelled=false;void loadLatestCity().then(result=>{if(result&&!cancelled&&!editedRef.current){const fresh={...result.city,paused:true};cityRef.current=fresh;setCity(fresh);undoRef.current=null;setCanUndo(false);setMessage(result.recoveredFromBackup?'保存内容に問題があったため、バックアップから都市を復元しました':'前回の都市を復元しました');}}).catch(e=>{if(!cancelled){setSaveLabel('復元できません');setMessage(e instanceof Error?e.message:'保存データを復元できませんでした');}});return()=>{cancelled=true;};},[]);
   useEffect(()=>{
@@ -141,7 +143,7 @@ export function App(){
       <nav aria-label="メインメニュー" className="menu">
         {([{id:'build',icon:'▦',name:'都市建設'},{id:'finance',icon:'▥',name:'財政と経済'},{id:'traffic',icon:'⇄',name:'交通・物流'},{id:'residents',icon:'♙',name:'住民と人口'},{id:'policy',icon:'⚑',name:'政策と行政'}] as const).map(item=><button key={item.id} className={`menu-link ${active===item.id?'active':''}`} onClick={()=>setActive(item.id)}><span className="menu-icon">{item.icon}</span>{item.name}{active===item.id&&<span className="menu-dot"/>}</button>)}
       </nav>
-      <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · FISCAL 0.6</div></div>
+      <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · LIVING CITY 0.7</div></div>
     </aside>
     <section className="workspace">
       <header className="topbar"><div className="breadcrumb">CITY OVERVIEW <span>/</span> <strong>{active==='build'?'都市建設':active==='finance'?'財政と経済':active==='traffic'?'交通・物流':active==='residents'?'住民と人口':'政策と行政'}</strong></div><div className="top-actions"><span className="autosave"><span className="save-dot"/>{saveLabel}</span><button className="top-button" onClick={manualSave}>保存</button><button className="top-button" onClick={()=>setHelp(true)} aria-label="ヘルプ">？</button></div></header>
@@ -158,6 +160,7 @@ export function App(){
               <button aria-label="拡大" onClick={()=>mapRef.current?.zoomBy(1.2)}>＋</button>
               <button aria-label="縮小" onClick={()=>mapRef.current?.zoomBy(1/1.2)}>－</button>
               <button aria-label="マップを中央に戻す" onClick={()=>mapRef.current?.resetView()}>⌂</button>
+              <button className="motion-toggle" aria-pressed={motion} aria-label={motion?'演出を停止':'演出を再開'} title="街のアニメーション" onClick={()=>setMotion(value=>!value)}>{motion?'✦':'◌'}</button>
             </div>
           </div>
           {active==='residents'&&<div className="land-legend" aria-label="土地評価の凡例"><strong>土地評価</strong><span><i className="land-low"/>低い</span><span><i className="land-mid"/>普通</span><span><i className="land-high"/>高い</span></div>}
@@ -245,6 +248,6 @@ export function App(){
         <div className="inspector-foot"><button onClick={()=>exportCity(city)}>都市データを書き出す ↗</button><button onClick={()=>importRef.current?.click()}>データを読み込む ↥</button><button onClick={()=>{void restoreBackup();}}>前回のバックアップを復元 ↶</button><input ref={importRef} type="file" accept=".json,application/json" hidden onChange={e=>{void doImport(e.currentTarget.files?.[0]);e.currentTarget.value='';}}/><button className="new-game" onClick={()=>{if(window.confirm('現在の都市を新規作成しますか？ 自動保存は上書きされます。')){const next=createCity();editedRef.current=true;setCity(next);cityRef.current=next;setSelected(null);undoRef.current=null;setCanUndo(false);setMode('pan');setTool('inspect');void saveCity(next);setMessage('新しい都市を作りました');}}}>新しい都市を始める</button></div></aside>
       </div>
     </section>
-    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「住民と人口」では、学校・公園・産業施設などによる土地評価を地図で確認できます。</li><li>「財政と経済」でインフラ保全計画を選べます。維持費を削ると修繕の積み残しが増えます。</li><li>赤字対策には行政支出抑制か市債による資金調達がありますが、満足度低下や返済負担に注意してください。</li><li>新しい住宅は空室として建設され、雇用・家賃・空室に応じて入居します。失業や生活費が高い場合は転出も起こります。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
+    {help&&<div className="modal-backdrop" role="presentation" onClick={()=>setHelp(false)}><div role="dialog" aria-modal="true" aria-label="操作ガイド" className="modal" onClick={e=>e.stopPropagation()}><button className="close" onClick={()=>setHelp(false)}>✕</button><h2>街づくりガイド</h2><p>都市マップをクリックして、道路や地区、公共施設を配置できます。</p><ul><li>道路に面した土地だけ住宅・商業・工業の開発が可能です。</li><li>時間を再生すると建物と人口が増え、毎月の収支も反映されます。</li><li>道路・地区・撤去・幹線道路への改良は「描く」モードでドラッグできます。</li><li>「交通・物流」では道路ごとの推定交通量を色分けして確認できます。</li><li>「住民と人口」では、学校・公園・産業施設などによる土地評価を地図で確認できます。</li><li>「財政と経済」でインフラ保全計画を選べます。維持費を削ると修繕の積み残しが増えます。</li><li>赤字対策には行政支出抑制か市債による資金調達がありますが、満足度低下や返済負担に注意してください。</li><li>新しい住宅は空室として建設され、雇用・家賃・空室に応じて入居します。失業や生活費が高い場合は転出も起こります。</li><li>「移動」モードで地図をドラッグして移動できます。拡大・縮小・中央に戻すボタンも利用可能です。</li><li>✦ボタンで車や煙、水面などの軽量アニメーションを停止・再開できます。端末の『動きを減らす』設定にも対応します。</li><li>Spaceキーで一時停止。Ctrl+Zまたは⌘Zで直前の建設を元に戻せます。</li><li>保存に問題があれば、自動的に前回のバックアップを確認します。</li><li>都市データはブラウザのIndexedDBに自動保存されます。端末を変える場合は書き出し機能を利用してください。</li></ul><button className="primary" onClick={()=>setHelp(false)}>街づくりを始める</button></div></div>}
   </main>;
 }
