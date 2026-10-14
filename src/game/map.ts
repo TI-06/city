@@ -262,13 +262,16 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   };
   app.ticker.add(onAnimationFrame);
   let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
-  let renderedDetail:StructureDetail|null=null,structureBuilds=0;
+  let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0;
   const refreshVisibleStructures=(force=false)=>{
     const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
     const detail=structureDetailAtZoom(zoom);
-    if(!force&&detail===renderedDetail&&!needsTileWindowRefresh(renderedWindow,visible))return;
+    const zoomChangedEnough=renderedZoom===0||zoom>renderedZoom*1.35||zoom<renderedZoom*.72;
+    if(!force&&detail===renderedDetail&&!zoomChangedEnough
+      &&!needsTileWindowRefresh(renderedWindow,visible))return;
     renderedWindow=paddedTileWindow(visible,8);
     renderedDetail=detail;
+    renderedZoom=zoom;
     const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
     structureBuilds++;
@@ -338,6 +341,9 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   app.canvas.addEventListener('pointerup',pointerUp);app.canvas.addEventListener('pointercancel',pointerCancel);
   app.canvas.addEventListener('lostpointercapture',lostCapture);app.canvas.addEventListener('pointerleave',leave);
   app.canvas.addEventListener('wheel',wheel,{passive:false});app.canvas.addEventListener('contextmenu',contextMenu);
+  // Re-evaluate visible structures after container/layout/rotation changes.
+  const resizeObserver=new ResizeObserver(()=>refreshVisibleStructures(true));
+  resizeObserver.observe(host);
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
@@ -353,6 +359,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();pulses=[];}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
+      resizeObserver.disconnect();
       app.ticker.remove(onAnimationFrame);
       app.canvas.removeEventListener('pointerdown',pointerDown);app.canvas.removeEventListener('pointermove',pointerMove);
       app.canvas.removeEventListener('pointerup',pointerUp);app.canvas.removeEventListener('pointercancel',pointerCancel);
