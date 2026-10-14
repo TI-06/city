@@ -347,7 +347,9 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     app.canvas.dataset.structureDetail=detail;
     app.canvas.dataset.structureBuilds=String(structureBuilds);
   };
-  const resetView=()=>{zoom=Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
+  // Phone play starts close enough to see houses, people and traffic.
+  // Players can pinch out for an overview at any time.
+  const resetView=()=>{zoom=mobileCanvas?0.78:Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();};
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
