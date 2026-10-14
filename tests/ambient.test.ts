@@ -97,3 +97,23 @@ describe('city growth determines street activity',()=>{
     expect(JSON.stringify(city)).toBe(before);
   });
 });
+
+describe('camera-driven local city bustle',()=>{
+  it('prioritizes near-camera roads and people while preserving scene caps and deterministic saves',()=>{
+    const city=createCity('見えるにぎわい',554);
+    const point={x:22,y:31};
+    const original=JSON.stringify(city);
+    const a=buildAmbientScene(city,point),b=buildAmbientScene(city,point);
+    expect(a).toEqual(b);
+    expect(a.lanes.length).toBeGreaterThan(0);
+    expect(a.lanes.length).toBeLessThanOrEqual(32);
+    expect(a.pedestrians.length).toBeLessThanOrEqual(24);
+    expect(a.windows.length).toBeLessThanOrEqual(32);
+    const distances=a.lanes.map(l=>Math.abs(l.x-point.x)+Math.abs(l.y-point.y));
+    const baseline=buildAmbientScene(city).lanes.map(l=>Math.abs(l.x-point.x)+Math.abs(l.y-point.y));
+    expect(Math.min(...distances)).toBeLessThanOrEqual(Math.min(...baseline));
+    const farAway=buildAmbientScene(city,{x:55,y:55});
+    expect(farAway).not.toEqual(a);
+    expect(JSON.stringify(city)).toBe(original);
+  });
+});
