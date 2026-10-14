@@ -56,3 +56,19 @@ test('construction is a visible state after a month rather than instant building
   await page.getByRole('button',{name:'翌月へ進める',exact:true}).click();
   await expect(page.locator('.map-host canvas')).toBeVisible();
 });
+
+test('a mayor can jump to the active construction site and watch a real district grow',async ({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/');
+  const canvas=page.locator('.map-host canvas');
+  await expect(canvas).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'翌月へ進める',exact:true}).click();
+  const focus=page.getByRole('button',{name:'工事現場へ移動する'});
+  await expect(focus).toBeVisible();
+  await expect(focus).toContainText('工事中');
+  await focus.click();
+  await expect(canvas).toHaveAttribute('data-focused-tile',/^\\d+,\\d+$/);
+  await expect(canvas).toBeVisible();
+  expect(errors).toEqual([]);
+});
