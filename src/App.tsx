@@ -11,7 +11,10 @@ import {buildingStyleLabel,getCityMoment,type CityMoment} from './game/city-mome
 import {canDragPaint,type InteractionMode,type TilePoint} from './core/paint';
 import {exportCity,importCity,loadCity,loadLatestCity,saveCity} from './persistence/storage';
 
-type Menu='build'|'finance'|'traffic'|'residents'|'policy';
+type Menu='build'|'data';
+type DataView='finance'|'traffic'|'residents'|'policy';
+type MayorSection='policy'|'budget'|'investment'|'analysis';
+type MapLayer='normal'|'traffic'|'land';
 type BuildGroup='zones'|'roads'|'services'|'manage';
 const buildGroups:readonly {id:BuildGroup;label:string;glyph:string}[]=[
   {id:'zones',label:'地区',glyph:'⌂'},
@@ -54,6 +57,10 @@ export function App(){
   const [canUndo,setCanUndo]=useState(false);
   const toolRef=useRef<Tool>('inspect');toolRef.current=tool;
   const [active,setActive]=useState<Menu>('build');
+  const [dataView,setDataView]=useState<DataView>('finance');
+  const [mayorOpen,setMayorOpen]=useState(false);
+  const [mayorSection,setMayorSection]=useState<MayorSection>('policy');
+  const [mapLayer,setMapLayer]=useState<MapLayer>('normal');
   const [mobileBuildGroup,setMobileBuildGroup]=useState<BuildGroup>('zones');
   const [mobileToolsOpen,setMobileToolsOpen]=useState(()=>!window.matchMedia('(max-width:700px)').matches);
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
@@ -127,7 +134,10 @@ export function App(){
   useEffect(()=>{mapRef.current?.setSelected(selected,tool);},[selected,tool]);
   useEffect(()=>{mapRef.current?.setMode(mode);},[mode]);
   useEffect(()=>{mapRef.current?.setMotion(motion);},[motion,ready]);
-  useEffect(()=>{mapRef.current?.setTrafficView(active==='traffic');mapRef.current?.setLandView(active==='residents');},[active,ready]);
+  useEffect(()=>{
+    mapRef.current?.setTrafficView(active==='data'?dataView==='traffic':mapLayer==='traffic');
+    mapRef.current?.setLandView(active==='data'?dataView==='residents':mapLayer==='land');
+  },[active,dataView,mapLayer,ready]);
   useEffect(()=>{let cancelled=false;void loadLatestCity().then(result=>{if(result&&!cancelled&&!editedRef.current){const fresh={...result.city,paused:true};cityRef.current=fresh;setCity(fresh);undoRef.current=null;setCanUndo(false);setMessage(result.recoveredFromBackup?'保存内容に問題があったため、バックアップから都市を復元しました':'前回の都市を復元しました');}}).catch(e=>{if(!cancelled){setSaveLabel('復元できません');setMessage(e instanceof Error?e.message:'保存データを復元できませんでした');}});return()=>{cancelled=true;};},[]);
   const progressMonth=useCallback((manual=false)=>{
     const previous=cityRef.current;
@@ -201,6 +211,7 @@ export function App(){
       if(window.matchMedia('(max-width:700px)').matches){
         setMobileToolsOpen(false);setMapQuickOpen(false);
       }
+      setMayorOpen(false);
     }else{setMobileToolsOpen(true);}
     setTool(t);setMode(canDragPaint(t)?'paint':'pan');setActive('build');
     setMessage(t==='inspect'?'調べたい建物や道路をクリックしてください':`${toolNames[t]}：地図をタップ・ドラッグして配置してください`);
@@ -216,28 +227,39 @@ export function App(){
     void saveCity(next);setMessage('新しい都市を作りました');
   };
   const switchMenu=(menu:Menu)=>{
-    setMobileMenuOpen(false);setMapQuickOpen(false);setActive(menu);
+    setMobileMenuOpen(false);setMapQuickOpen(false);setMayorOpen(false);setActive(menu);
     if(menu==='build'){setMode(canDragPaint(tool)?'paint':'pan');}
     else setMode('pan');
   };
+  const openData=(view:DataView)=>{setDataView(view);switchMenu('data');};
+  const openMayor=()=>{
+    if(!mayorOpen){
+      setMapQuickOpen(false);
+      if(window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);
+    }
+    setMayorOpen(!mayorOpen);
+  };
   const openMapQuick=()=>{
-    if(!mapQuickOpen&&window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);
+    if(!mapQuickOpen){
+      setMayorOpen(false);
+      if(window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);
+    }
     setMapQuickOpen(prev=>!prev);
   };
   const selectedStyle=selected?buildingStyleLabel(city,selected.x,selected.y):null;
   const selectedDescription=selected?`${selectedStyle?`${selectedStyle} ／ `:''}${describeTile(city,selected.x,selected.y)}`:'マップをクリックして土地を選択';
   const selectedLandScore=selected?land.values[tileIndex(selected.x,selected.y)]:undefined;
-  return <main className="app-shell" data-active-menu={active} data-tools-open={mobileToolsOpen?'yes':'no'} data-map-quick-open={mapQuickOpen?'yes':'no'}>
+  return <main className="app-shell" data-active-menu={active} data-tools-open={mobileToolsOpen?'yes':'no'} data-map-quick-open={mapQuickOpen?'yes':'no'} data-mayor-open={mayorOpen?'yes':'no'}>
     <aside className="sidebar">
       <div className="brand"><div className="brandmark">C<span>•</span></div><div><strong>CITYSCAPE</strong><small>街づくりと都市経営</small></div></div>
       <div className="sidebar-section-label">CITY MANAGER</div>
       <nav aria-label="メインメニュー" className="menu">
-        {([{id:'build',icon:'▦',name:'都市建設'},{id:'finance',icon:'▥',name:'財政と経済'},{id:'traffic',icon:'⇄',name:'交通・物流'},{id:'residents',icon:'♙',name:'住民と人口'},{id:'policy',icon:'⚑',name:'政策と行政'}] as const).map(item=><button key={item.id} className={`menu-link ${active===item.id?'active':''}`} onClick={()=>switchMenu(item.id)} aria-current={active===item.id?'page':undefined}><span className="menu-icon">{item.icon}</span>{item.name}{active===item.id&&<span className="menu-dot"/>}</button>)}
+        {([{id:'build',icon:'▦',name:'街を運営'},{id:'data',icon:'▥',name:'都市データ'}] as const).map(item=><button key={item.id} className={`menu-link ${active===item.id?'active':''}`} onClick={()=>switchMenu(item.id)} aria-current={active===item.id?'page':undefined}><span className="menu-icon">{item.icon}</span>{item.name}{active===item.id&&<span className="menu-dot"/>}</button>)}
       </nav>
       <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · CITY GROWTH 0.8</div></div>
     </aside>
     <section className="workspace">
-      <header className="topbar"><div className="breadcrumb">CITY OVERVIEW <span>/</span> <strong>{active==='build'?'都市建設':active==='finance'?'財政と経済':active==='traffic'?'交通・物流':active==='residents'?'住民と人口':'政策と行政'}</strong></div><div className="top-actions"><span className="autosave"><span className="save-dot"/>{saveLabel}</span><button className="top-button" onClick={manualSave}>保存</button><button className="top-button" onClick={()=>setHelp(true)} aria-label="ヘルプ">？</button><button className="top-button mobile-menu-button" aria-label="都市データ管理" aria-expanded={mobileMenuOpen} onClick={()=>setMobileMenuOpen(value=>!value)}>☰</button></div></header>
+      <header className="topbar"><div className="breadcrumb">CITY OVERVIEW <span>/</span> <strong>{active==='build'?'街を運営':'都市データ'}</strong></div><div className="top-actions"><span className="autosave"><span className="save-dot"/>{saveLabel}</span><button className="top-button" onClick={manualSave}>保存</button><button className="top-button" onClick={()=>setHelp(true)} aria-label="ヘルプ">？</button><button className="top-button mobile-menu-button" aria-label="都市データ管理" aria-expanded={mobileMenuOpen} onClick={()=>setMobileMenuOpen(value=>!value)}>☰</button></div></header>
       {mobileMenuOpen&&<div className="mobile-utilities" role="dialog" aria-label="都市データ管理">
         <div className="mobile-utilities-head"><strong>都市データ管理</strong><button onClick={()=>setMobileMenuOpen(false)} aria-label="閉じる">✕</button></div>
         <button onClick={()=>{exportCity(city);setMobileMenuOpen(false);}}>都市データを書き出す</button>
@@ -281,6 +303,74 @@ export function App(){
               </div>
             </div>}
           </div>}
+          {active==='build'&&<div className={`mayor-control ${mayorOpen?'open':''}`} aria-label="地図上の市長コマンド">
+            <button type="button" className="mayor-trigger" onClick={openMayor}
+              aria-label={mayorOpen?'市長コマンドを閉じる':'市長コマンドを開く'} aria-expanded={mayorOpen}>
+              <span>⚑</span><strong>市長コマンド</strong><span>{mayorOpen?'⌄':'⌃'}</span>
+            </button>
+            {mayorOpen&&<section className="mayor-sheet" role="region" aria-label="市長コマンドの操作">
+              <div className="mayor-sheet-header"><div><strong>市政と都市経営</strong><small>地図を離れずに変更できます</small></div>
+                <button type="button" onClick={()=>setMayorOpen(false)} aria-label="市長コマンドの操作を閉じる">✕</button>
+              </div>
+              <div className="mayor-sections" role="group" aria-label="市長コマンドの分類">
+                {([{id:'policy',label:'市政方針'},{id:'budget',label:'税金・予算'},{id:'investment',label:'大型投資'},{id:'analysis',label:'街の診断'}] as const)
+                  .map(item=><button type="button" key={item.id} aria-pressed={mayorSection===item.id}
+                    className={mayorSection===item.id?'selected':''} onClick={()=>setMayorSection(item.id)}>{item.label}</button>)}
+              </div>
+              <div className="mayor-sheet-content">
+                {mayorSection==='policy'&&<div className="mayor-policy-grid" role="group" aria-label="地図から市政方針を選択">
+                  {([{id:'balanced',desc:'生活と経済を両立'},{id:'growth',desc:'産業と税収を重視'},{id:'eco',desc:'環境と暮らしを優先'},{id:'mobility',desc:'交通負荷を軽減'}] as {id:Policy;desc:string}[])
+                    .map(item=><button key={item.id} type="button" aria-pressed={city.policy===item.id}
+                      className={city.policy===item.id?'selected':''} onClick={()=>applyPolicy(item.id)}>
+                      <strong>{POLICY_LABELS[item.id]}</strong><small>{item.desc}</small></button>)}
+                  <p className="mayor-note">現在：{POLICY_LABELS[city.policy]} · 毎月の収支 {stats.balance>=0?'+':''}{format(stats.balance)} C</p>
+                </div>}
+                {mayorSection==='budget'&&<div className="mayor-budget">
+                  <div className="mayor-tax"><label htmlFor="mayor-tax">住民税率 <strong>{city.tax}%</strong></label>
+                    <input id="mayor-tax" type="range" min="3" max="18" value={city.tax}
+                      onChange={e=>applyTax(Number(e.target.value))}/></div>
+                  <strong className="mayor-subtitle">施設の維持方針</strong>
+                  <div className="mayor-choice-grid" role="group" aria-label="地図から維持方針を変更">
+                    {(['minimum','standard','preventive'] as const).map(plan=><button key={plan}
+                      type="button" aria-pressed={stats.maintenancePlan===plan} className={stats.maintenancePlan===plan?'selected':''}
+                      onClick={()=>applyMaintenance(plan)}>{MAINTENANCE_LABELS[plan]}</button>)}
+                  </div>
+                  <strong className="mayor-subtitle">財政の運営</strong>
+                  <div className="mayor-choice-grid" role="group" aria-label="地図から財政運営を変更">
+                    {([{id:'normal',label:'通常運営'},{id:'austerity',label:'支出抑制'}] as const).map(option=>
+                      <button type="button" key={option.id} aria-pressed={stats.fiscalMode===option.id}
+                        className={stats.fiscalMode===option.id?'selected':''} onClick={()=>setFiscalMode(option.id)}>{option.label}</button>)}
+                  </div>
+                  <div className="mayor-budget-footer"><span>市の資金 {format(city.funds)} C</span>
+                    <button type="button" disabled={stats.debtHeadroom<BOND_AMOUNT} onClick={borrow}>市債を発行</button></div>
+                </div>}
+                {mayorSection==='investment'&&<div className="mayor-investments">
+                  {(['transit','housing','culture'] as const).map(kind=>{
+                    const cost=capitalNextCost(city,kind);
+                    return <div className="mayor-invest-row" key={kind}>
+                      <div><strong>{CAPITAL_LABELS[kind]}</strong><small>Lv.{capitalLevel(city,kind)} / 3 · {cost===undefined?'整備完了':`${format(cost)} C`}</small></div>
+                      <button type="button" onClick={()=>invest(kind)} disabled={cost===undefined||city.funds<cost}
+                        aria-label={`地図から${CAPITAL_LABELS[kind]}へ投資`}>投資</button>
+                    </div>;
+                  })}
+                  <p className="mayor-note">事業は街全体に反映され、毎月の運営費も増加します。</p>
+                </div>}
+                {mayorSection==='analysis'&&<div className="mayor-analysis">
+                  <div className="mayor-snapshot"><span>人口 <strong>{format(stats.population)}人</strong></span>
+                    <span>満足度 <strong>{stats.happiness}</strong></span>
+                    <span>交通混雑 <strong>{stats.congestion}%</strong></span>
+                    <span>工事 <strong>{activeSites.length}件</strong></span></div>
+                  <strong className="mayor-subtitle">マップで確認</strong>
+                  <div className="mayor-choice-grid" role="group" aria-label="地図の分析表示">
+                    {([{id:'normal',name:'通常地図'},{id:'traffic',name:'交通量'},{id:'land',name:'土地評価'}] as const).map(item=>
+                      <button key={item.id} type="button" className={mapLayer===item.id?'selected':''} aria-pressed={mapLayer===item.id}
+                        onClick={()=>{setMapLayer(item.id);setMayorOpen(false);}}>{item.name}</button>)}
+                  </div>
+                  <button type="button" className="mayor-data-link" onClick={()=>openData('finance')}>都市データの詳細を見る ↗</button>
+                </div>}
+              </div>
+            </section>}
+          </div>}
           {active==='build'&&focusSite&&<button type="button" className="map-construction-focus"
             onClick={viewConstruction} aria-label="工事現場へ移動する">
             <span className="construction-pulse-dot"/> 🏗 工事中 {activeSites.length}件 <strong>現場を見る ↗</strong>
@@ -296,8 +386,8 @@ export function App(){
           </div>}
           {active==='build'&&<div className="mobile-progress-chip" role="status"><span>🏗 工事中 {activeSites.length}件</span><span>開発可能 {readyToBuild}区画 · 建築待ち {waiting}区画</span></div>}
           {selected&&tool==='inspect'&&<div className="mobile-tile-info" role="note"><div><strong>区画 {selected.x}, {selected.y}</strong><button aria-label="区画情報を閉じる" onClick={()=>setSelected(null)}>✕</button></div><p>{selectedDescription}</p></div>}
-          {active==='residents'&&<div className="land-legend" aria-label="土地評価の凡例"><strong>土地評価</strong><span><i className="land-low"/>低い</span><span><i className="land-mid"/>普通</span><span><i className="land-high"/>高い</span></div>}
-          {active==='traffic'&&<div className="traffic-legend" aria-label="推定交通量の凡例"><strong>交通負荷</strong><span><i className="traffic-low"/>余裕</span><span><i className="traffic-medium"/>注意</span><span><i className="traffic-high"/>混雑</span></div>}
+          {(active==='data'?dataView==='residents':mapLayer==='land')&&<div className="land-legend" aria-label="土地評価の凡例"><strong>土地評価</strong><span><i className="land-low"/>低い</span><span><i className="land-mid"/>普通</span><span><i className="land-high"/>高い</span></div>}
+          {(active==='data'?dataView==='traffic':mapLayer==='traffic')&&<div className="traffic-legend" aria-label="推定交通量の凡例"><strong>交通負荷</strong><span><i className="traffic-low"/>余裕</span><span><i className="traffic-medium"/>注意</span><span><i className="traffic-high"/>混雑</span></div>}
            <div className="map-hint">{mode==='paint'&&canDragPaint(tool)?`${toolNames[tool]}：ドラッグでまとめて配置 ／ 移動は「移動」ボタン`:'ドラッグで移動 ／ クリックして選択 ／ ホイールで拡大縮小'}</div>
         </div><div className="notice"><span>ⓘ</span><span role="status">{message}</span></div>
         {active==='build'&&<section className="development-panel" aria-label="都市開発の進捗">
@@ -313,7 +403,13 @@ export function App(){
           <div className="development-actions"><span>地区を指定すると需要に応じて自動着工。建物の完成までゲーム内で1〜6か月かかります。</span><button type="button" onClick={()=>progressMonth(true)}>翌月へ進めて発展を確認 →</button></div>
         </section>}
         {active==='build'&&<div className={`build-panel ${mobileToolsOpen?'':'dock-collapsed'}`} data-mobile-category={mobileBuildGroup}><div className="panel-title"><strong>建設・都市開発</strong><span>設置する施設を選択</span><button className="undo-button" onClick={undo} disabled={!canUndo} title="Ctrl+Z / ⌘Z">↶ 元に戻す</button><button className="mobile-dock-toggle" aria-label={mobileToolsOpen?'建設メニューを閉じる':'建設メニューを開く'} aria-expanded={mobileToolsOpen} onClick={()=>setMobileToolsOpen(v=>!v)}>{mobileToolsOpen?'⌄ 閉じる':'⌃ 建設を開く'}</button></div><div className="mobile-build-categories" role="group" aria-label="建設カテゴリ">{buildGroups.map(group=><button key={group.id} aria-pressed={mobileBuildGroup===group.id} className={mobileBuildGroup===group.id?'selected':''} onClick={()=>setMobileBuildGroup(group.id)}><span>{group.glyph}</span> {group.label}</button>)}</div><div className="tool-grid">{palettes.map(p=><button key={p.tool} data-category={categoryOfTool(p.tool)} title={p.hint} aria-pressed={tool===p.tool} onClick={()=>setCurrentTool(p.tool)} className={`tool-tile ${tool===p.tool?'active':''}`}><span className="tool-glyph">{p.icon}</span><strong>{toolNames[p.tool]}</strong><small>{COSTS[p.tool]===0?'選択':`${format(COSTS[p.tool])} C`}</small></button>)}</div><p className="mobile-build-advice">{developmentHint}</p></div>}
-        {active==='traffic'&&<div className="data-panel traffic-panel">
+        {active==='data'&&<div className="city-data-tabs" role="tablist" aria-label="都市データの表示切替">
+          {([{id:'finance',label:'財政と経済'},{id:'traffic',label:'交通・物流'},{id:'residents',label:'住民と人口'},{id:'policy',label:'政策と行政'}] as const)
+            .map(item=><button key={item.id} type="button" role="tab" aria-selected={dataView===item.id}
+              className={dataView===item.id?'selected':''} onClick={()=>setDataView(item.id)}>{item.label}</button>)}
+          <button type="button" className="data-back-to-city" onClick={()=>switchMenu('build')}>↶ 地図に戻る</button>
+        </div>}
+        {active==='data'&&dataView==='traffic'&&<div className="data-panel traffic-panel">
           <div className="panel-title"><strong>交通分析</strong><span>道路の接続・通勤・物流の推定値</span></div>
           <div className="metric-grid">
             <div><small>推定混雑度</small><b>{stats.congestion}%</b></div>
@@ -329,7 +425,7 @@ export function App(){
           <div className="traffic-advice">{stats.employed===0?'就業者がいません。住宅と職場を道路でつなぎ、雇用を増やしましょう。':stats.congestion>45?'交通が集中しています。職場と住宅を分散させ、別の道路ネットワークで混雑を軽減しましょう。':stats.congestion>20?'交通に負荷がかかっています。マップ上の橙・赤色の道路を確認しましょう。':'通勤路の混雑は小さい状態です。新しい開発地区と職場の接続を確認しましょう。'}</div>
           <p className="traffic-note">一般道路の容量は85、幹線道路は220。幹線道路は1マス420 Cの改良費と追加維持費がかかります。交差点制御や迂回行動は未導入です。</p>
         </div>}
-        {active==='finance'&&<div className="data-panel finance-panel"><div className="panel-title"><strong>財政と経済</strong><span>都市の収入・支出・更新計画</span></div><div className="metric-grid">
+        {active==='data'&&dataView==='finance'&&<div className="data-panel finance-panel"><div className="panel-title"><strong>財政と経済</strong><span>都市の収入・支出・更新計画</span></div><div className="metric-grid">
             <div><small>税収・企業収入</small><b className="positive">+{format(stats.income)} C / 月</b></div>
             <div><small>月間支出合計</small><b className="negative">−{format(stats.expenses)} C / 月</b></div>
             <div><small>インフラ更新予算</small><b>{format(stats.renewalSpending)} C / 月</b></div>
@@ -386,8 +482,8 @@ export function App(){
           </div>
           <div className="control-row"><label htmlFor="tax">住民税率 <strong>{city.tax}%</strong></label><input id="tax" type="range" min="3" max="18" value={city.tax} onChange={e=>applyTax(Number(e.target.value))}/></div>
         </div>}
-        {active==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>戸建て・連棟住宅</small><b>{skyline.cottages} 棟</b></div><div><small>中低層マンション</small><b>{skyline.apartments} 棟</b></div><div><small>高層マンション</small><b>{skyline.towers} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div><div><small>住宅地の平均土地評価</small><b>{land.averageResidential}/100</b></div><div><small>高評価の土地</small><b>{format(land.desirableTiles)} マス</b></div><div><small>住宅の収容人数</small><b>{format(stats.housingCapacity)} 人</b></div><div><small>住宅の空き</small><b>{format(stats.housingVacancies)} 人分</b></div><div><small>推定家賃</small><b>{stats.estimatedRent.toFixed(1)} C / 人・月</b></div><div><small>支援後の家賃負担</small><b>{stats.netRent.toFixed(1)} C / 人・月</b></div><div><small>家賃負担率</small><b>{stats.rentBurden}%</b></div><div><small>住居負担のしやすさ</small><b>{stats.affordability} / 100</b></div><div><small>来月の推定人口移動</small><b className={stats.expectedMigration>=0?'positive':'negative'}>{stats.expectedMigration>0?'+':''}{format(stats.expectedMigration)} 人</b></div></div><div className="housing-advice" role="note">{stats.housingVacancies===0?'住宅が満室です。新たな住宅地区を指定すると入居できる場所が増えます。':stats.employed===0?'住宅の空きはありますが仕事が不足しています。商業・工業地区と道路を整備しましょう。':stats.rentBurden>65?'家賃負担が重い状態です。住宅を増やしたり、雇用・交通条件を改善しましょう。':'住宅の入居は空室、仕事、家賃負担、住民満足度で月ごとに変化します。'}</div></div>}
-        {active==='policy'&&<div className="data-panel"><div className="panel-title"><strong>市政方針</strong><span>都市の経営方針を選択</span></div><div className="policy-grid">{([{id:'balanced',desc:'住民と経済をバランスよく成長'},{id:'growth',desc:'税収増を狙うが環境に負荷'},{id:'eco',desc:'住環境を優先し産業利益は減少'},{id:'mobility',desc:'公共交通・時差通勤を補助し、混雑を軽減するが運営費が増加'}] as {id:Policy;desc:string}[]).map(p=><button key={p.id} className={`policy-option ${city.policy===p.id?'current':''}`} onClick={()=>applyPolicy(p.id)}><b>{POLICY_LABELS[p.id]}</b><small>{p.desc}</small></button>)}</div></div>}
+        {active==='data'&&dataView==='residents'&&<div className="data-panel"><div className="panel-title"><strong>住民と都市の成長</strong><span>人口の推移と雇用</span></div><Sparkline numbers={city.history.map(x=>x.population)}/><div className="metric-grid"><div><small>住宅建物</small><b>{stats.homes} 棟</b></div><div><small>戸建て・連棟住宅</small><b>{skyline.cottages} 棟</b></div><div><small>中低層マンション</small><b>{skyline.apartments} 棟</b></div><div><small>高層マンション</small><b>{skyline.towers} 棟</b></div><div><small>雇用枠</small><b>{format(stats.jobs)} 人</b></div><div><small>就業者</small><b>{format(stats.employed)} 人</b></div><div><small>空き求人</small><b>{format(stats.vacancies)} 件</b></div><div><small>住宅地の平均土地評価</small><b>{land.averageResidential}/100</b></div><div><small>高評価の土地</small><b>{format(land.desirableTiles)} マス</b></div><div><small>住宅の収容人数</small><b>{format(stats.housingCapacity)} 人</b></div><div><small>住宅の空き</small><b>{format(stats.housingVacancies)} 人分</b></div><div><small>推定家賃</small><b>{stats.estimatedRent.toFixed(1)} C / 人・月</b></div><div><small>支援後の家賃負担</small><b>{stats.netRent.toFixed(1)} C / 人・月</b></div><div><small>家賃負担率</small><b>{stats.rentBurden}%</b></div><div><small>住居負担のしやすさ</small><b>{stats.affordability} / 100</b></div><div><small>来月の推定人口移動</small><b className={stats.expectedMigration>=0?'positive':'negative'}>{stats.expectedMigration>0?'+':''}{format(stats.expectedMigration)} 人</b></div></div><div className="housing-advice" role="note">{stats.housingVacancies===0?'住宅が満室です。新たな住宅地区を指定すると入居できる場所が増えます。':stats.employed===0?'住宅の空きはありますが仕事が不足しています。商業・工業地区と道路を整備しましょう。':stats.rentBurden>65?'家賃負担が重い状態です。住宅を増やしたり、雇用・交通条件を改善しましょう。':'住宅の入居は空室、仕事、家賃負担、住民満足度で月ごとに変化します。'}</div></div>}
+        {active==='data'&&dataView==='policy'&&<div className="data-panel"><div className="panel-title"><strong>市政方針</strong><span>都市の経営方針を選択</span></div><div className="policy-grid">{([{id:'balanced',desc:'住民と経済をバランスよく成長'},{id:'growth',desc:'税収増を狙うが環境に負荷'},{id:'eco',desc:'住環境を優先し産業利益は減少'},{id:'mobility',desc:'公共交通・時差通勤を補助し、混雑を軽減するが運営費が増加'}] as {id:Policy;desc:string}[]).map(p=><button key={p.id} className={`policy-option ${city.policy===p.id?'current':''}`} onClick={()=>applyPolicy(p.id)}><b>{POLICY_LABELS[p.id]}</b><small>{p.desc}</small></button>)}</div></div>}
         </div>
         <aside className="inspector"><div className="inspector-header"><span className="inspector-label">CITY INSIGHTS</span><strong>都市の状況</strong></div><div className="inspector-body"><div className="info-highlight"><span className="tiny-label">選択中のエリア</span><strong>{selected?`区画 ${selected.x}, ${selected.y}`:'区画を選択'}</strong><p>{selectedDescription}</p>{selectedLandScore!==undefined&&selectedLandScore>0&&<p className="selected-land-value">土地評価：<strong>{selectedLandScore}/100</strong></p>}</div><div className="inspector-section"><div className="section-title"><strong>都市の指標</strong><span>月次更新</span></div><div className="inspector-kpi"><span>住宅</span><b>{stats.homes}棟</b></div><div className="inspector-kpi"><span>商業</span><b>{stats.commerce}棟</b></div><div className="inspector-kpi"><span>工業</span><b>{stats.industry}棟</b></div><div className="inspector-kpi"><span>道路</span><b>{stats.roads}マス</b></div><div className="inspector-kpi"><span>推定混雑度</span><b>{stats.congestion}%</b></div><div className="inspector-kpi"><span>公園</span><b>{stats.green}か所</b></div></div><div className="inspector-section"><div className="section-title"><strong>都市の成長</strong><span>直近120か月</span></div><Sparkline numbers={city.history.map(x=>x.population)}/></div><div className="tips"><span>💡 市長へのヒント</span><p>道路の隣に住宅・商業・工業地区を指定すると、時間の経過で建物が建設されます。</p></div></div>
         <div className="inspector-foot"><button onClick={()=>exportCity(city)}>都市データを書き出す ↗</button><button onClick={()=>importRef.current?.click()}>データを読み込む ↥</button><button onClick={()=>{void restoreBackup();}}>前回のバックアップを復元 ↶</button><input ref={importRef} type="file" accept=".json,application/json" hidden onChange={e=>{void doImport(e.currentTarget.files?.[0]);e.currentTarget.value='';}}/><button className="new-game" onClick={startNewCity}>新しい都市を始める</button></div></aside>

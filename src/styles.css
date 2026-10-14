@@ -364,3 +364,69 @@
 }
 @media(max-width:390px){.map-construction-focus{top:76px;right:6px;max-width:180px;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.construction-pulse-dot{animation:none}}
+
+/* Phase 5-5 — One continuous game screen; data is an optional destination. */
+.mayor-control{position:absolute;right:12px;bottom:14px;z-index:11;pointer-events:none;color:#224a37}
+.mayor-control button,.mayor-control .mayor-sheet{pointer-events:auto;touch-action:manipulation}
+.mayor-trigger{min-height:44px;display:flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid #f3d28c;border-radius:12px;background:#244d3c;color:#ffefd1;box-shadow:0 7px 25px #122d2490}
+.mayor-trigger span:first-child{font-size:20px}
+.mayor-trigger strong{font-size:12px;white-space:nowrap}
+.mayor-sheet{position:absolute;right:0;bottom:calc(100% + 8px);width:min(358px,calc(100vw - 24px));max-height:min(66dvh,470px);overflow:hidden;display:flex;flex-direction:column;border:1px solid #adcbb7;border-radius:16px;background:#f7fbf3f8;box-shadow:0 18px 42px #11332783}
+.mayor-sheet-header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#1e5741;color:white;padding:11px 13px}
+.mayor-sheet-header>div{display:flex;flex-direction:column;gap:3px}
+.mayor-sheet-header strong{font-size:13px}.mayor-sheet-header small{font-size:10px;color:#d0ebdc}
+.mayor-sheet-header button{min-width:34px;min-height:34px;border-radius:9px;background:#40765c;color:white}
+.mayor-sections{flex:none;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));padding:7px;gap:4px;border-bottom:1px solid #d9e8dc}
+.mayor-sections button{min-height:38px;padding:5px 2px;font-size:10px;font-weight:800;color:#386b52;background:#eaf1e9;border-radius:8px}
+.mayor-sections button.selected{color:white;background:#318060}
+.mayor-sheet-content{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 12px 15px;scrollbar-width:thin}
+.mayor-policy-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.mayor-policy-grid>button{display:flex;flex-direction:column;gap:4px;align-items:flex-start;min-height:59px;padding:9px;border:1px solid #d1e2d2;border-radius:10px;text-align:left;background:white;color:#26533d}
+.mayor-policy-grid strong{font-size:11px}.mayor-policy-grid small{font-size:10px;color:#698071}
+.mayor-policy-grid>button.selected{border-color:#25865c;background:#dff1e4}
+.mayor-note{font-size:10px;line-height:1.55;color:#5c7464;margin:9px 0 0;grid-column:1/-1}
+.mayor-budget{display:flex;flex-direction:column;gap:10px}
+.mayor-tax{display:flex;flex-direction:column;gap:5px;font-size:11px;color:#345c49}
+.mayor-tax label{display:flex;align-items:center;justify-content:space-between}
+.mayor-tax input{width:100%;accent-color:#2a8158}
+.mayor-subtitle{display:block;font-size:11px;color:#2b5842}
+.mayor-choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.mayor-choice-grid button{min-height:41px;padding:7px 4px;border-radius:9px;border:1px solid #c8dfd0;background:#fff;color:#32634d;font-size:10px;font-weight:800}
+.mayor-choice-grid button.selected{background:#d5f0df;border-color:#318b63}
+.mayor-budget-footer{display:flex;align-items:center;justify-content:space-between;gap:7px;font-size:10px;color:#2a5941;border-top:1px solid #d2e4d8;padding-top:9px}
+.mayor-budget-footer button,.mayor-invest-row button{min-height:37px;padding:7px 10px;border-radius:8px;background:#28785b;color:white;font-size:10px;font-weight:800}
+.mayor-budget-footer button:disabled,.mayor-invest-row button:disabled{opacity:.45;cursor:default}
+.mayor-investments{display:flex;flex-direction:column;gap:7px}
+.mayor-invest-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;background:white;border:1px solid #d7e7dc;border-radius:10px}
+.mayor-invest-row div{display:flex;flex-direction:column;gap:4px}
+.mayor-invest-row strong{font-size:11px;color:#2f6147}.mayor-invest-row small{font-size:10px;color:#61776a}
+.mayor-analysis{display:flex;flex-direction:column;gap:10px}
+.mayor-snapshot{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.mayor-snapshot span{display:flex;flex-direction:column;gap:4px;padding:10px;background:#e9f4e9;border-radius:10px;font-size:10px;color:#54745c}
+.mayor-snapshot strong{font-size:15px;color:#244f3c}
+.mayor-data-link{align-self:stretch;min-height:38px;border-radius:9px;background:#245d44;color:white;font-weight:800;font-size:11px}
+.city-data-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:0 0 10px;padding:9px;background:#e5efe6;border-radius:12px}
+.city-data-tabs button{min-height:37px;padding:8px 12px;border-radius:9px;color:#426b57;background:#f7fbf6;font-size:11px;font-weight:800}
+.city-data-tabs button.selected{background:#247657;color:white}
+.city-data-tabs .data-back-to-city{margin-left:auto;background:#d2e8d8}
+@media(max-width:700px){
+ .menu{justify-content:center;gap:10px}
+ .menu-link{width:min(48%,180px);min-width:0;flex:1;font-size:12px}
+ .mayor-control{position:absolute;right:8px;bottom:calc(116px + env(safe-area-inset-bottom));z-index:17}
+ .app-shell[data-tools-open="yes"] .mayor-control{bottom:calc(258px + env(safe-area-inset-bottom))}
+ .app-shell[data-map-quick-open="yes"] .mayor-control{bottom:calc(116px + env(safe-area-inset-bottom))}
+ .mayor-trigger{min-height:46px;padding:8px 10px}
+ .mayor-trigger strong{font-size:11px}
+ .mayor-sheet{max-height:min(60dvh,430px);width:min(350px,calc(100vw - 18px))}
+ .mayor-sections button{font-size:10px;min-height:42px}
+ .mayor-sheet-content{padding-bottom:18px}
+ .app-shell[data-mayor-open="yes"] .build-panel{display:none}
+ .app-shell[data-mayor-open="yes"] .mayor-control{bottom:calc(75px + env(safe-area-inset-bottom))}
+ .app-shell[data-mayor-open="yes"] .notice{bottom:calc(79px + env(safe-area-inset-bottom))}
+ .city-data-tabs{position:fixed;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom) + min(58dvh,620px));z-index:16;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:0;padding:7px 8px;background:#e6f2e9;border-radius:12px 12px 0 0;box-shadow:0 -4px 13px #0c31233a}
+ .city-data-tabs button{min-height:36px;font-size:9px;padding:5px 2px;white-space:nowrap}
+ .city-data-tabs .data-back-to-city{grid-column:1/-1;min-height:32px;margin:0}
+ .main-panel>.data-panel{max-height:min(58dvh,620px)}
+}
+@media(max-width:370px){.mayor-sheet{max-height:48dvh}.mayor-policy-grid strong{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.mayor-control,.mayor-sheet{animation:none!important;transition:none!important}}

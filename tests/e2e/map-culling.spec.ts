@@ -31,9 +31,10 @@ test('render visible structures only, adapt detail to zoom, and keep map usable'
   await page.mouse.up();
   await expect(canvas).toBeVisible();
   await page.getByRole('button',{name:'マップを中央に戻す'}).click();
-  await page.getByRole('button',{name:'住民と人口'}).click();
+  await page.getByRole('button',{name:'都市データ',exact:true}).click();
+  await page.getByRole('tab',{name:'住民と人口'}).click();
   await expect(page.locator('.land-legend')).toBeVisible();
-  await page.getByRole('button',{name:/交通・物流/}).click();
+  await page.getByRole('tab',{name:'交通・物流'}).click();
   await expect(page.locator('.traffic-legend')).toBeVisible();
   expect(errors).toEqual([]);
 });
