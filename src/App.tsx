@@ -235,7 +235,7 @@ export function App(){
       <div className="sidebar-section-label">CITY MANAGER</div>
       <nav aria-label="メインメニュー" className="menu">
         <button className={`menu-link ${active==='build'?'active':''}`} onClick={()=>switchMenu('build')} aria-current={active==='build'?'page':undefined}><span className="menu-icon">▦</span>街を運営</button>
-        <button className={`menu-link ${active!=='build'?'active':''}`} onClick={()=>switchMenu('finance')} aria-current={active!=='build'?'page':undefined}><span className="menu-icon">▤</span>都市データ</button>
+        <button className={`menu-link ${active!=='build'?'active':''}`} aria-label="都市データ" onClick={()=>switchMenu('finance')} aria-current={active!=='build'?'page':undefined}><span className="menu-icon">▤</span>都市データ</button>
       </nav>
       <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · CITY GROWTH 0.8</div></div>
     </aside>
