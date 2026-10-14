@@ -5,7 +5,7 @@ export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
 export type Zone = 0 | 1 | 2 | 3;
 export type Tool = 'inspect' | 'road' | 'home' | 'shop' | 'industry' | 'park' | 'school' | 'clinic' | 'bulldoze';
-export type Policy = 'balanced' | 'growth' | 'eco';
+export type Policy = 'balanced' | 'growth' | 'eco' | 'mobility';
 export type Building = { id: number; x: number; y: number; kind: Exclude<Zone, 0>; level: number; residents: number; jobs: number };
 export type Service = { id: number; x: number; y: number; kind: 'park' | 'school' | 'clinic' };
 export type History = { month: number; population: number; funds: number; income: number; expense: number; happiness: number };
@@ -19,7 +19,7 @@ export type Stats = { population: number; jobs: number; employed: number; vacanc
 const COST: Record<Tool, number> = { inspect: 0, road: 65, home: 12, shop: 12, industry: 12, park: 750, school: 2900, clinic: 4200, bulldoze: 90 };
 export const COSTS = COST;
 export const SERVICE_COST: Record<Service['kind'], number> = { park: 18, school: 95, clinic: 145 };
-export const POLICY_LABELS: Record<Policy, string> = { balanced: '均衡発展', growth: '産業振興', eco: '環境優先' };
+export const POLICY_LABELS: Record<Policy, string> = { balanced: '均衡発展', growth: '産業振興', eco: '環境優先', mobility: '公共交通重視' };
 const idx = (x: number, y: number) => y * SIZE + x;
 export const inside = (x: number, y: number) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < SIZE && y < SIZE;
 const seeded = (v: number) => ((v ^ (v >>> 16)) * 2246822519) >>> 0;
@@ -78,7 +78,8 @@ export function getStats(city:City):Stats {
   const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0)-Math.round(traffic.congestion*0.18)-disconnectedPenalty)));
   const enterpriseFactor=city.policy==='growth'?1.22:city.policy==='eco'?0.9:1;
   const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor*traffic.productivity);
-  const expenses=Math.round(roads*0.85+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85);
+  const transportProgram=city.policy==='mobility'?90+population*0.14:0;
+  const expenses=Math.round(roads*0.85+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85+transportProgram);
   return {population,jobs,employed,vacancies,happiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity};
 }
 const historyEntry=(city:City):History=>{const s=getStats(city);return {month:city.month,population:s.population,funds:city.funds,income:s.income,expense:s.expenses,happiness:s.happiness};};
@@ -209,7 +210,7 @@ export function validateCity(candidate:unknown):City{
   const c=candidate as Partial<City>;
   if(c.schema!==SAVE_SCHEMA||!Array.isArray(c.land)||!Array.isArray(c.roads)||!Array.isArray(c.zones)||c.land.length!==SIZE*SIZE||c.roads.length!==SIZE*SIZE||c.zones.length!==SIZE*SIZE)throw new Error('対応していないセーブデータです');
   if(!Array.isArray(c.buildings)||!Array.isArray(c.services)||!Array.isArray(c.history)||!Number.isSafeInteger(c.funds)||!Number.isSafeInteger(c.month)||!Number.isSafeInteger(c.random)||!Number.isSafeInteger(c.nextId)||!Number.isInteger(c.tax)||c.tax!<3||c.tax!>18)throw new Error('セーブデータが破損しています');
-  if(typeof c.name!=='string'||c.name.length>50||!['eco','growth','balanced'].includes(c.policy??''))throw new Error('都市の設定が無効です');
+  if(typeof c.name!=='string'||c.name.length>50||!['eco','growth','balanced','mobility'].includes(c.policy??''))throw new Error('都市の設定が無効です');
   const occupied=new Set<number>(),ids=new Set<number>();
   for(const b of c.buildings){if(!inside(b.x,b.y)||!Number.isInteger(b.id)||!Number.isInteger(b.level)||b.level<1||b.level>3||![1,2,3].includes(b.kind)||!Number.isSafeInteger(b.residents)||!Number.isSafeInteger(b.jobs))throw new Error('建物情報が無効です');const i=idx(b.x,b.y);if(occupied.has(i)||ids.has(b.id))throw new Error('建物が重複しています');occupied.add(i);ids.add(b.id);}
   for(const s of c.services){if(!inside(s.x,s.y)||!['park','school','clinic'].includes(s.kind)||!Number.isInteger(s.id))throw new Error('公共施設情報が無効です');const i=idx(s.x,s.y);if(occupied.has(i)||ids.has(s.id))throw new Error('公共施設が重複しています');occupied.add(i);ids.add(s.id);}
