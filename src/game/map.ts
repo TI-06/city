@@ -1,5 +1,5 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js';
-import { buildAmbientScene, type AmbientScene } from './ambient';
+import { buildAmbientScene, sampleVehicle, sampleWalker, nightLevel, type AmbientScene } from './ambient';
 import {visibleTileWindow,paddedTileWindow,needsTileWindowRefresh,structureDetailAtZoom,tileNearViewport,type TileWindow,type StructureDetail} from './viewport';
 import {appendGrowthPulses,detectGrowthEvents,visualMood,type CityMood,type GrowthPulse} from './visual-state';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
@@ -139,35 +139,76 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
  */
 function renderAmbient(g:Graphics,scene:AmbientScene,time:number){
   g.clear();
+  const dusk=nightLevel(time);
+  // Routed cars and buses complete connected journeys, disappear at a stop,
+  // then resume a newly chosen trip. Only the active tiny sprites are drawn.
   for(const lane of scene.lanes){
-    const t=(1+Math.sin(time*2*Math.PI/lane.period+lane.phase*6.283))/2;
-    const a=tilePosition(lane.x,lane.y),b=tilePosition(lane.toX,lane.toY);
-    const px=a.x+(b.x-a.x)*t,py=a.y+(b.y-a.y)*t+HH;
-    g.ellipse(px+1,py+3,lane.bus?7:4.5,lane.bus?3:2.6).fill({color:0x203b41,alpha:.19});
-    g.ellipse(px,py,lane.bus?6:3.8,lane.bus?2.9:2.1)
-      .fill({color:lane.bus?0x56d3f1:0xf5e6b6,alpha:.98});
-    if(lane.bus)g.circle(px+1,py,1).fill({color:0xffffff,alpha:.85});
-  }
-  for(const f of scene.factories){
-    const p=tilePosition(f.x,f.y);
-    for(let i=0;i<3;i++){
-      const progress=(time*.21+f.phase+i/3)%1;
-      g.circle(p.x+16+progress*13,p.y-28-progress*27,2.3+progress*4.3)
-        .fill({color:0xe8e9e6,alpha:.33*(1-progress)});
+    const moving=sampleVehicle(lane,time);
+    if(!moving)continue;
+    const p=tilePosition(moving.x,moving.y),py=p.y+HH;
+    const bus=moving.bus;
+    g.ellipse(p.x+2,py+4,bus?7:5,bus?3:2.8).fill({color:0x152b31,alpha:.22*moving.alpha});
+    g.ellipse(p.x,py,bus?6.6:4.3,bus?3:2.5)
+      .fill({color:bus?0x39cbed:0xf2dd9a,alpha:moving.alpha});
+    g.circle(p.x-1,py-1,1).fill({color:bus?0xeaffff:0xffffff,alpha:moving.alpha});
+    if(dusk>.15){
+      const dx=(moving.directionX-moving.directionY)*2.5;
+      const dy=(moving.directionX+moving.directionY)*1.2;
+      g.circle(p.x+dx,py+dy,1.8).fill({color:0xfff6c9,alpha:dusk*.8*moving.alpha});
     }
   }
+  // Walkers are present only while travelling; idle and shopping periods
+  // deliberately produce a less mechanical, intermittently alive street.
+  for(const walker of scene.pedestrians){
+    const moving=sampleWalker(walker,time);
+    if(!moving)continue;
+    const p=tilePosition(moving.x,moving.y),ground=p.y+HH+6;
+    g.ellipse(p.x+3,ground+3,2.7,1.4).fill({color:0x1b473b,alpha:.2*moving.alpha});
+    g.circle(p.x,ground-4,2.1).fill({color:walker.residents>0?0xffda9a:0xb5c9e7,alpha:moving.alpha});
+    g.moveTo(p.x,ground-1).lineTo(p.x,ground+3).stroke({width:1.5,color:0x355d70,alpha:moving.alpha});
+  }
+  // Workday smoke appears in separate bursts, with offsets per factory.
+  for(const f of scene.factories){
+    const p=tilePosition(f.x,f.y),cycle=(time+f.phase*13)/11;
+    const batch=Math.floor(cycle),local=cycle-batch;
+    if(batch%5===3)continue;
+    for(let i=0;i<3;i++){
+      const age=(local*1.45-i*.28);
+      if(age<=0||age>=1)continue;
+      const side=Math.sin(batch*3.1+i*1.7+f.phase*5)*5;
+      g.circle(p.x+15+side+age*9,p.y-26-age*28,2+age*4.8)
+        .fill({color:0xe3e7df,alpha:(1-age)*.35});
+    }
+  }
+  // Parks and waterways become active at different moments rather than
+  // repeating the same ellipse position on every frame.
   for(const park of scene.parks){
-    const p=tilePosition(park.x,park.y);
-    const wobble=time*1.2+park.phase*6.28;
-    g.circle(p.x+Math.sin(wobble)*8,p.y+HH-4+Math.cos(wobble*1.7)*5,2)
-      .fill({color:0xffe8a0,alpha:.7});
+    const phase=(time*.14+park.phase)%1;
+    if(phase>.64)continue;
+    const p=tilePosition(park.x,park.y),sweep=phase/.64;
+    g.circle(p.x-12+sweep*21,p.y+HH+Math.sin(sweep*6)*5,1.9)
+      .fill({color:0xffe49c,alpha:Math.min(1,sweep*5,(1-sweep)*5)*.85});
   }
   for(const water of scene.water){
-    const p=tilePosition(water.x,water.y);
-    const alpha=.12+.24*(.5+.5*Math.sin(time*1.5+water.phase*6.28));
-    const offset=Math.sin(time*.7+water.phase*9)*5;
-    g.moveTo(p.x-9+offset,p.y+HH-2).lineTo(p.x+3+offset,p.y+HH-5)
-      .stroke({color:0xe3fcfd,width:1.6,alpha});
+    const phase=(time*.12+water.phase)%1;
+    if(phase>.6)continue;
+    const p=tilePosition(water.x,water.y),progress=phase/.6;
+    const x=p.x-15+progress*26;
+    g.moveTo(x,p.y+HH-2).lineTo(x+8,p.y+HH-5)
+      .stroke({color:0xe1fdff,width:1.5,alpha:(1-progress)*.5});
+  }
+  // Night activity is a separate small set of emissive windows, not a redraw
+  // of the 4,096-tile city. Their lights change across successive evenings.
+  if(dusk>.02){
+    for(const w of scene.windows){
+      const date=Math.floor(time/72);
+      if((Math.floor(w.phase*100)+date*7)%5===0)continue;
+      const p=tilePosition(w.x,w.y);
+      g.circle(p.x+7,p.y-11,3.5)
+        .fill({color:0xffdb8b,alpha:dusk*.26});
+      g.rect(p.x+5,p.y-13,4,4)
+        .fill({color:0xffe5a7,alpha:dusk*.80});
+    }
   }
 }
 /**
@@ -192,8 +233,26 @@ function renderCityEffects(g:Graphics,city:City,mood:CityMood,pulses:readonly Gr
     const pt=tilePosition(pulse.x,pulse.y);
     const t=age/3,alpha=.8*(1-t);
     const gold=pulse.kind==='upgrade'?0xffdb73:pulse.kind==='service'?0x77dbec:0x9ce4a1;
-    const radius=6+16*t;
-    g.circle(pt.x,pt.y-12,radius).stroke({width:2.5-1.4*t,color:gold,alpha});
+    const radius=6+19*t;
+    g.circle(pt.x,pt.y-12,radius).stroke({width:2.8-1.4*t,color:gold,alpha});
+    // Construction site: scaffolding rises, dust puffs and a crane hook
+    // descends. The event plays once, then vanishes; it is never persisted.
+    if(pulse.kind!=='service'){
+      const rise=Math.sin(Math.min(1,t*2)*Math.PI/2);
+      const top=pt.y+8-28*rise;
+      g.moveTo(pt.x-13,pt.y+11).lineTo(pt.x-13,top)
+        .lineTo(pt.x+12,top).lineTo(pt.x+12,pt.y+11)
+        .stroke({color:0xe9bb74,width:1.6,alpha:alpha*.85});
+      g.moveTo(pt.x-15,top-6).lineTo(pt.x+18,top-6)
+        .stroke({color:0xffd48c,width:1.8,alpha:alpha*.9});
+      g.moveTo(pt.x+9,top-6).lineTo(pt.x+9,top+10*t)
+        .stroke({color:0xd7b892,width:1,alpha});
+      for(let i=0;i<3;i++){
+        const wave=(t+i/3)%1;
+        g.circle(pt.x+(i-1)*12+wave*4,pt.y+HH-wave*13,2+wave*3)
+          .fill({color:0xded9c4,alpha:(1-wave)*alpha*.55});
+      }
+    }
     g.circle(pt.x,pt.y-12,3+4*t).fill({color:gold,alpha:alpha*.42});
   }
 }
@@ -356,7 +415,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
-      const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects;
+      const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects||next.policy!==city.policy||next.month!==city.month;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
       city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
