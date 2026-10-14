@@ -12,7 +12,7 @@ const CELL_COUNT = SIZE * SIZE;
 const LABOR_RATIO = 0.53;
 
 type Network = Readonly<{ componentByTile: Int32Array; componentCount: number }>;
-const networkCache = new WeakMap<number[], Network>();
+// Rebuild from current tiles: no stale graph when a test/import mutates an existing grid.
 
 export type TrafficAnalysis = Readonly<{
   roadComponents: number;
@@ -39,8 +39,6 @@ function neighbors(index: number, roads: readonly number[]): number[] {
 }
 
 function getNetwork(roads: number[]): Network {
-  const cached = networkCache.get(roads);
-  if (cached) return cached;
   const componentByTile = new Int32Array(CELL_COUNT).fill(-1);
   let componentCount = 0;
   for (let i = 0; i < CELL_COUNT; i++) {
@@ -56,9 +54,7 @@ function getNetwork(roads: number[]): Network {
     }
     componentCount++;
   }
-  const network = { componentByTile, componentCount };
-  networkCache.set(roads, network);
-  return network;
+  return { componentByTile, componentCount };
 }
 
 /** Select a building's lowest-index orthogonally adjacent road tile. */
