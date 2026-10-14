@@ -7,6 +7,7 @@ test('render visible structures only, adapt detail to zoom, and keep map usable'
   const canvas=page.locator('.map-host canvas');
   await expect(canvas).toBeVisible({timeout:30_000});
   await expect(canvas).toHaveAttribute('data-structure-detail',/overview|detail/);
+  await expect(canvas).toHaveAttribute('data-structure-cached','true');
   const initial=await canvas.evaluate(el=>({
     tiles:Number((el as HTMLCanvasElement).dataset.structureTiles),
     builds:Number((el as HTMLCanvasElement).dataset.structureBuilds),
