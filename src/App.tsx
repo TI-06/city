@@ -3,7 +3,7 @@ import {analyzeLand} from './core/land';
 import {MAINTENANCE_LABELS,type MaintenancePlan} from './core/lifecycle';
 import {BOND_AMOUNT,type FiscalMode} from './core/fiscal';
 import {CAPITAL_LABELS,CAPITAL_NOTES,capitalLevel,capitalNextCost,type CapitalKind} from './core/capital';
-import {applyStroke,advanceMonths,changePolicy,changeTax,changeMaintenancePlan,fundCapitalProject,changeFiscalMode,issueMunicipalBond,createCity,describeTile,getStats,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS,tileIndex} from './core/city';
+import {applyStroke,advanceMonths,changePolicy,changeTax,changeMaintenancePlan,fundCapitalProject,changeFiscalMode,issueMunicipalBond,createCity,describeTile,getStats,getDevelopmentOutlook,type City,type Policy,type Tool,COSTS,toolNames,POLICY_LABELS,tileIndex} from './core/city';
 import {mountMap,type MapController} from './game/map';
 import {visualMood} from './game/visual-state';
 import {canDragPaint,type InteractionMode,type TilePoint} from './core/paint';
@@ -54,6 +54,17 @@ export function App(){
   const visualStatus=visualMood(city);
   const visualLabel=visualStatus==='crisis'?'財政危機':visualStatus==='repairs'?'修繕の遅れ':visualStatus==='developing'?'都市発展中':'安定した街';
   const land=useMemo(()=>analyzeLand(city),[city]);
+  const development=getDevelopmentOutlook(city,stats);
+  const waiting=development.pending.home+development.pending.shop+development.pending.industry;
+  const readyToBuild=development.ready.home+development.ready.shop+development.ready.industry;
+  const developmentHint=development.pausedByHappiness?'住民満足度が40未満のため、民間開発が止まっています。税率や公共サービスを見直しましょう。'
+    :waiting===0?(development.disconnected>0?'道路から切り離された開発地区があります。道路をつなぎ直してください。':'開発待ちの地区がありません。道路沿いの空き地に住宅・商業・工業地区を指定しましょう。')
+    :readyToBuild===0?[
+      development.pending.home>0&&development.ready.home===0?'住宅：空室が多いため新築を見合わせています。先に入居と雇用を増やしましょう。':null,
+      development.pending.shop+development.pending.industry>0&&development.ready.shop+development.ready.industry===0?'商業・工業：求人の空きが多く、新規建築を見合わせています。住宅や人口を増やしましょう。':null,
+    ].filter(Boolean).join(' ')
+    :city.paused?'開発可能な地区があります。下の「翌月へ進める」で建物の建設を確認できます。'
+    :'開発可能な地区があります。毎月、需要と立地評価に応じて建物が建ちます。';
   const onTiles=useCallback((points:readonly TilePoint[])=>{
     const last=points[points.length-1];
     if(!last)return;
@@ -91,11 +102,31 @@ export function App(){
   useEffect(()=>{mapRef.current?.setMotion(motion);},[motion,ready]);
   useEffect(()=>{mapRef.current?.setTrafficView(active==='traffic');mapRef.current?.setLandView(active==='residents');},[active,ready]);
   useEffect(()=>{let cancelled=false;void loadLatestCity().then(result=>{if(result&&!cancelled&&!editedRef.current){const fresh={...result.city,paused:true};cityRef.current=fresh;setCity(fresh);undoRef.current=null;setCanUndo(false);setMessage(result.recoveredFromBackup?'保存内容に問題があったため、バックアップから都市を復元しました':'前回の都市を復元しました');}}).catch(e=>{if(!cancelled){setSaveLabel('復元できません');setMessage(e instanceof Error?e.message:'保存データを復元できませんでした');}});return()=>{cancelled=true;};},[]);
+  const progressMonth=useCallback((manual=false)=>{
+    const previous=cityRef.current;
+    const next=advanceMonths(previous,1);
+    const oldBuildings=new Set(previous.buildings.map(b=>b.id));
+    const erected=next.buildings.filter(b=>!oldBuildings.has(b.id));
+    const counts={
+      home:erected.filter(b=>b.kind===1).length,
+      shop:erected.filter(b=>b.kind===2).length,
+      industry:erected.filter(b=>b.kind===3).length,
+    };
+    const populationDelta=getStats(next).population-getStats(previous).population;
+    const detail=erected.length
+      ?'新築 '+[counts.home&&`住宅${counts.home}棟`,counts.shop&&`商業${counts.shop}棟`,counts.industry&&`工業${counts.industry}棟`].filter(Boolean).join('・')
+      :'新築なし（開発状況を確認してください）';
+    setMessage(`${monthText(next.month)}：${detail} ／ 人口 ${populationDelta>0?'+':''}${populationDelta}人`);
+    editedRef.current=true;
+    undoRef.current=null;setCanUndo(false);
+    cityRef.current=next;setCity(next);
+    if(manual||next.month%2===0)void saveCity(next).then(()=>setSaveLabel('自動保存済み')).catch(()=>setSaveLabel('保存エラー'));
+  },[]);
   useEffect(()=>{
     if(city.paused)return;
-    const timer=window.setInterval(()=>{const next=advanceMonths(cityRef.current,1);undoRef.current=null;setCanUndo(false);cityRef.current=next;setCity(next);if(next.month%2===0)void saveCity(next).then(()=>setSaveLabel('自動保存済み')).catch(()=>setSaveLabel('保存エラー'));},20000/city.speed);
+    const timer=window.setInterval(()=>progressMonth(),20000/city.speed);
     return()=>window.clearInterval(timer);
-  },[city.paused,city.speed]);
+  },[city.paused,city.speed,progressMonth]);
   useEffect(()=>{const handler=(e:KeyboardEvent)=>{if(e.code==='Space'&&!['INPUT','TEXTAREA','BUTTON'].includes((e.target as HTMLElement).tagName)){e.preventDefault();setCity(c=>({...c,paused:!c.paused}));}if(e.code==='Escape'){setTool('inspect');setMode('pan');}if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'&&!['INPUT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();undo();}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[undo]);
   const toggle=()=>setCity(c=>({...c,paused:!c.paused}));
   const setSpeed=(speed:1|2|4)=>setCity(c=>({...c,speed,paused:false}));
@@ -150,7 +181,7 @@ export function App(){
     </aside>
     <section className="workspace">
       <header className="topbar"><div className="breadcrumb">CITY OVERVIEW <span>/</span> <strong>{active==='build'?'都市建設':active==='finance'?'財政と経済':active==='traffic'?'交通・物流':active==='residents'?'住民と人口':'政策と行政'}</strong></div><div className="top-actions"><span className="autosave"><span className="save-dot"/>{saveLabel}</span><button className="top-button" onClick={manualSave}>保存</button><button className="top-button" onClick={()=>setHelp(true)} aria-label="ヘルプ">？</button></div></header>
-      <div className="city-bar"><div><div className="eyebrow">MY CITY · JAPAN</div><div className="city-heading"><h1>{city.name}</h1><span className="level-tag">発展中の街</span></div><p>あなたの選択が、街の未来をつくる。</p></div><div className="time-control"><div className="date-label">▣ {monthText(city.month)}</div><div className="time-buttons"><button aria-label={city.paused?'再生':'一時停止'} onClick={toggle} className="play-button">{city.paused?'▶':'Ⅱ'}</button>{([1,2,4] as const).map(n=><button key={n} className={!city.paused&&city.speed===n?'chosen':''} onClick={()=>setSpeed(n)}>×{n}</button>)}</div></div></div>
+      <div className="city-bar"><div><div className="eyebrow">MY CITY · JAPAN</div><div className="city-heading"><h1>{city.name}</h1><span className="level-tag">発展中の街</span></div><p>あなたの選択が、街の未来をつくる。</p></div><div className="time-control"><div className="date-label">▣ {monthText(city.month)}</div><div className="time-buttons"><button aria-label={city.paused?'再生':'一時停止'} onClick={toggle} className="play-button">{city.paused?'▶':'Ⅱ'}</button>{([1,2,4] as const).map(n=><button key={n} className={!city.paused&&city.speed===n?'chosen':''} onClick={()=>setSpeed(n)}>×{n}</button>)}<button type="button" className="next-month-button" aria-label="翌月へ進める" onClick={()=>progressMonth(true)}>翌月へ ▶|</button></div></div></div>
       <div className="stat-strip"><div className="stat"><span>総人口</span><strong>{format(stats.population)} <small>人</small></strong><em>⌁ 街の住民</em></div><div className="stat"><span>市の資金</span><strong>{format(city.funds)} <small>C</small></strong><em>◈ 現在の予算</em></div><div className="stat"><span>月間収支</span><strong className={stats.balance>=0?'positive':'negative'}>{stats.balance>=0?'+':''}{format(stats.balance)} <small>C</small></strong><em>前月規模の見込み</em></div><div className="stat"><span>住民満足度</span><strong>{stats.happiness}<small> / 100</small></strong><div className="mini-progress"><i style={{width:`${stats.happiness}%`}}/></div></div></div>
       <div className="content-area">
         <div className="main-panel"><div className="map-heading"><div><strong>都市マップ</strong><span>建設・道路・地区を編集</span></div><div className="map-heading-right"><span className="map-status"><b/> {ready?'マップ稼働中':'読み込み中'}</span><span className={`map-civic-indicator mood-${visualStatus}`} aria-label={`街の状態：${visualLabel}`} role="status">{visualStatus==='crisis'?'⚠':visualStatus==='repairs'?'◆':'✦'} {visualLabel}</span><span className="map-size">64 × 64</span></div></div><div className="map-host" ref={mapHost}>
@@ -170,6 +201,17 @@ export function App(){
           {active==='traffic'&&<div className="traffic-legend" aria-label="推定交通量の凡例"><strong>交通負荷</strong><span><i className="traffic-low"/>余裕</span><span><i className="traffic-medium"/>注意</span><span><i className="traffic-high"/>混雑</span></div>}
            <div className="map-hint">{mode==='paint'&&canDragPaint(tool)?`${toolNames[tool]}：ドラッグでまとめて配置 ／ 移動は「移動」ボタン`:'ドラッグで移動 ／ クリックして選択 ／ ホイールで拡大縮小'}</div>
         </div><div className="notice"><span>ⓘ</span><span role="status">{message}</span></div>
+        {active==='build'&&<section className="development-panel" aria-label="都市開発の進捗">
+          <div className="development-header"><strong>🏗 開発の進捗</strong><span>{city.paused?'⏸ 時間は停止中':'▶ 時間進行中'}</span></div>
+          <div className="development-counts">
+            <div><small>住宅の建築待ち</small><strong>{development.pending.home}<em>区画</em></strong><span>建築可能 {development.ready.home}</span></div>
+            <div><small>商業の建築待ち</small><strong>{development.pending.shop}<em>区画</em></strong><span>建築可能 {development.ready.shop}</span></div>
+            <div><small>工業の建築待ち</small><strong>{development.pending.industry}<em>区画</em></strong><span>建築可能 {development.ready.industry}</span></div>
+          </div>
+          <p className="development-guidance" role="status">{developmentHint}</p>
+          {development.disconnected>0&&<p className="development-disconnected">道路に接していない開発待ち地区：{development.disconnected}区画</p>}
+          <div className="development-actions"><span>地区指定だけでは建物は建ちません。時間を進めると自動で発展します。</span><button type="button" onClick={()=>progressMonth(true)}>翌月へ進めて発展を確認 →</button></div>
+        </section>}
         {active==='build'&&<div className="build-panel"><div className="panel-title"><strong>建設・都市開発</strong><span>設置する施設を選択</span><button className="undo-button" onClick={undo} disabled={!canUndo} title="Ctrl+Z / ⌘Z">↶ 元に戻す</button></div><div className="tool-grid">{palettes.map(p=><button key={p.tool} title={p.hint} aria-pressed={tool===p.tool} onClick={()=>setCurrentTool(p.tool)} className={`tool-tile ${tool===p.tool?'active':''}`}><span className="tool-glyph">{p.icon}</span><strong>{toolNames[p.tool]}</strong><small>{COSTS[p.tool]===0?'選択':`${format(COSTS[p.tool])} C`}</small></button>)}</div></div>}
         {active==='traffic'&&<div className="data-panel traffic-panel">
           <div className="panel-title"><strong>交通分析</strong><span>道路の接続・通勤・物流の推定値</span></div>
