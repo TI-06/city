@@ -79,3 +79,21 @@ describe('non-repeating activity phases',()=>{
     expect(JSON.stringify(city)).toBe(before);
   });
 });
+
+describe('city growth determines street activity',()=>{
+  it('adds walking opportunities and increases vehicle probability with city population',()=>{
+    const city=createCity('都市のにぎわい',333);
+    const before=JSON.stringify(city);
+    const quiet={...city,buildings:city.buildings.map(b=>b.kind===1?{...b,residents:0}:b)};
+    const crowded={...city,buildings:city.buildings.map(b=>b.kind===1?{...b,residents:12}:b)};
+    const first=buildAmbientScene(quiet);
+    const second=buildAmbientScene(crowded);
+    expect(second.pedestrians.length).toBeGreaterThanOrEqual(first.pedestrians.length);
+    expect(second.windows.length).toBeGreaterThanOrEqual(first.windows.length);
+    expect(second.lanes.reduce((n,l)=>n+l.density,0)).toBeGreaterThanOrEqual(
+      first.lanes.reduce((n,l)=>n+l.density,0));
+    expect(second.pedestrians.length).toBeLessThanOrEqual(24);
+    expect(second.lanes.length).toBeLessThanOrEqual(32);
+    expect(JSON.stringify(city)).toBe(before);
+  });
+});
