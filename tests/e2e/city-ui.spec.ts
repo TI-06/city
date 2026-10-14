@@ -77,3 +77,16 @@ test('arterial upgrade tool is available in the city map editor on mobile and de
   await expect(page.getByText('幹線道路に改良済み')).toBeVisible();
   await expect(page.getByText(/容量は85、幹線道路は220/)).toBeVisible();
 });
+
+test('resident land valuation map and neighborhood metrics work on desktop and mobile', async ({page}) => {
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'住民と人口'}).click();
+  await expect(page.locator('.land-legend')).toBeVisible();
+  await expect(page.getByText('住宅地の平均土地評価')).toBeVisible();
+  await expect(page.getByText('高評価の土地')).toBeVisible();
+  await expect(page.locator('.map-host canvas')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
