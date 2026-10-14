@@ -25,7 +25,8 @@ test('mobile city uses a map-first game HUD and quick build dock',async ({page},
   await page.getByRole('button',{name:'都市データ管理'}).click();
   await expect(page.getByRole('dialog',{name:'都市データ管理'})).toBeVisible();
   await page.getByRole('dialog',{name:'都市データ管理'}).getByRole('button',{name:'閉じる',exact:true}).click();
-  await page.getByRole('button',{name:'財政と経済'}).click();
+  await page.getByRole('button',{name:'都市データ'}).click();
+  await page.getByRole('navigation',{name:'都市データの切替'}).getByRole('button',{name:'財政と経済'}).click();
   await expect(page.locator('.finance-panel')).toBeVisible();
   await expect(page.locator('.map-host canvas')).toBeVisible();
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth+1);
