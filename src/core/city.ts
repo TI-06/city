@@ -1,6 +1,7 @@
 /** All game logic is deterministic and independent of the renderer and browser storage. */
 import { analyzeTraffic } from './traffic';
-export const SIZE = 64;
+import { SIZE } from './grid';
+export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
 export type Zone = 0 | 1 | 2 | 3;
 export type Tool = 'inspect' | 'road' | 'home' | 'shop' | 'industry' | 'park' | 'school' | 'clinic' | 'bulldoze';
