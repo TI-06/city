@@ -1,5 +1,7 @@
 /** All game logic is deterministic and independent of the renderer and browser storage. */
-export const SIZE = 64;
+import { analyzeTraffic } from './traffic';
+import { SIZE } from './grid';
+export { SIZE } from './grid';
 export const SAVE_SCHEMA = 1;
 export type Zone = 0 | 1 | 2 | 3;
 export type Tool = 'inspect' | 'road' | 'home' | 'shop' | 'industry' | 'park' | 'school' | 'clinic' | 'bulldoze';
@@ -12,7 +14,7 @@ export type City = {
   land: number[]; roads: number[]; zones: number[]; buildings: Building[]; services: Service[];
   nextId: number; history: History[]; paused: boolean; speed: 1 | 2 | 4;
 };
-export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number };
+export type Stats = { population: number; jobs: number; employed: number; vacancies: number; happiness: number; income: number; expenses: number; balance: number; homes: number; roads: number; commerce: number; industry: number; green: number; roadComponents: number; disconnectedResidents: number; roadlessJobs: number; congestion: number; congestedRoads: number; averageCommute: number; worstRoadLoad: number; trafficProductivity: number };
 
 const COST: Record<Tool, number> = { inspect: 0, road: 65, home: 12, shop: 12, industry: 12, park: 750, school: 2900, clinic: 4200, bulldoze: 90 };
 export const COSTS = COST;
@@ -62,7 +64,8 @@ export function getStats(city:City):Stats {
   const population=city.buildings.reduce((n,b)=>n+b.residents,0);
   const jobs=city.buildings.reduce((n,b)=>n+b.jobs,0);
   const labor=Math.round(population*0.53);
-  const employed=Math.min(labor,jobs);
+  const traffic=analyzeTraffic(city);
+  const employed=Math.min(labor,jobs,traffic.employed);
   const commerce=city.buildings.filter(b=>b.kind===2).length;
   const industry=city.buildings.filter(b=>b.kind===3).length;
   const roads=city.roads.reduce((n,v)=>n+(v===1?1:0),0);
@@ -71,11 +74,12 @@ export function getStats(city:City):Stats {
   const access=Math.min(16,city.services.filter(s=>s.kind!=='park').length*5);
   const pollution=Math.round(industry*.65*(city.policy==='eco'?0.6:1));
   const crowded=population>2000?Math.min(12,(population-2000)/200):0;
-  const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0))));
+  const disconnectedPenalty=labor===0?0:Math.min(12,Math.round((labor-employed)/labor*12));
+  const happiness=Math.max(20,Math.min(98,Math.round(62+green*2+access-pollution-crowded+(city.tax-9)*-1.4+(city.policy==='eco'?8:city.policy==='growth'?-3:0)-Math.round(traffic.congestion*0.18)-disconnectedPenalty)));
   const enterpriseFactor=city.policy==='growth'?1.22:city.policy==='eco'?0.9:1;
-  const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor);
+  const income=Math.round(population*(city.tax/10)*2.2 + employed*1.5 + (commerce*32+industry*40)*enterpriseFactor*traffic.productivity);
   const expenses=Math.round(roads*0.85+city.services.reduce((n,s)=>n+SERVICE_COST[s.kind],0)+population*.55+85);
-  return {population,jobs,employed,vacancies,happiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green};
+  return {population,jobs,employed,vacancies,happiness,income,expenses,balance:income-expenses,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity};
 }
 const historyEntry=(city:City):History=>{const s=getStats(city);return {month:city.month,population:s.population,funds:city.funds,income:s.income,expense:s.expenses,happiness:s.happiness};};
 export type CommandResult = {ok:true;changed:boolean;message:string;city:City}|{ok:false;changed:false;message:string;city:City};
