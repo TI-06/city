@@ -63,11 +63,12 @@ export function assessHousing(
   const departure=Math.min(occupied,Math.ceil(
     (unemployment>0.24?jobless*0.028:0)+
     (rentBurden>65?occupied*0.008:0)+
-    (happiness<45?occupied*0.007:0)
+    (happiness<35?occupied*0.007:0)
   ));
   const opportunity=Math.max(0,jobSlots-employed);
-  const entry=happiness>=48&&rentBurden<=75?
-    Math.min(vacant,Math.max(0,Math.floor(opportunity*0.11)),8):0;
+  const attraction=clamp((happiness-25)/50,0.2,1);
+  const entry=happiness>=35&&rentBurden<=95?
+    Math.min(vacant,Math.max(0,Math.floor(opportunity*0.11*attraction)),8):0;
   return {
     capacity,occupied,vacant,demandGap,estimatedRent,rentBurden,
     affordability,monthlyMigrationEstimate:entry-departure,averageHousingLand,
