@@ -39,3 +39,43 @@ describe('bounded visual-only city activity',()=>{
     expect(before).not.toContain('animationTime');
   });
 });
+
+import {sampleVehicle,sampleWalker,nightLevel} from '../src/game/ambient';
+
+describe('non-repeating activity phases',()=>{
+  it('travels over multiple connected road tiles and takes different trips',()=>{
+    const city=createCity('移動する交通',524);
+    const lane=buildAmbientScene(city).lanes.find(l=>l.route.length>=4);
+    expect(lane).toBeDefined();
+    expect(lane!.route.length).toBeGreaterThan(2);
+    for(const [a,b] of lane!.route.slice(1).map((v,i)=>[lane!.route[i]!,v] as const)){
+      expect(Math.abs(a.x-b.x)+Math.abs(a.y-b.y)).toBe(1);
+    }
+    const fixed={...lane!,density:1,phase:0};
+    const first=sampleVehicle(fixed,1);
+    const next=sampleVehicle(fixed,1+fixed.period*2);
+    expect(first).not.toBeNull();
+    expect(next).not.toBeNull();
+    expect(first).not.toEqual(next);
+    expect(sampleVehicle(fixed,fixed.travelSeconds+.2)).toBeNull();
+  });
+  it('has day and night with changing window illumination',()=>{
+    expect(nightLevel(0)).toBe(0);
+    expect(nightLevel(42)).toBeGreaterThan(.8);
+    expect(nightLevel(70)).toBe(0);
+    expect(nightLevel(42+72)).toBeCloseTo(nightLevel(42));
+  });
+  it('schedules walkers intermittently and remains save-neutral',()=>{
+    const city=createCity('人通り',292);
+    const before=JSON.stringify(city);
+    const scene=buildAmbientScene(city);
+    expect(scene.pedestrians.length).toBeGreaterThan(0);
+    expect(scene.pedestrians.length).toBeLessThanOrEqual(24);
+    expect(scene.windows.length).toBeLessThanOrEqual(32);
+    const walker=scene.pedestrians[0]!;
+    const some=Array.from({length:75},(_,t)=>sampleWalker(walker,t));
+    expect(some.some(v=>v!==null)).toBe(true);
+    expect(some.some(v=>v===null)).toBe(true);
+    expect(JSON.stringify(city)).toBe(before);
+  });
+});
