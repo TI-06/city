@@ -478,6 +478,9 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false,landVisible=false;
   let scene=buildAmbientScene(initial),mood=visualMood(initial),pulses:GrowthPulse[]=[],motionEnabled=!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   let animationTime=0,frameBudget=0,monthElapsed=0,siteDrawElapsed=0;
+  // Month-step animations use a transient 1.9s visual catch-up. Saves still
+  // advance atomically, but a paused player can now SEE foundations rise.
+  let monthTweenStart:number|null=null;
   const onAnimationFrame=(ticker:Ticker)=>{
     if(!motionEnabled||document.hidden)return;
     frameBudget+=Math.min(75,ticker.deltaMS);
@@ -487,11 +490,16 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
       monthElapsed=Math.min(20/Math.max(1,city.speed),monthElapsed+elapsed);
     }
     siteDrawElapsed+=elapsed;
-    if(siteDrawElapsed>(mobileCanvas?0.16:0.11) && !city.paused && city.construction?.length){
+    const tweenElapsed=monthTweenStart===null?Infinity:animationTime-monthTweenStart;
+    if(monthTweenStart!==null&&tweenElapsed>=1.9)monthTweenStart=null;
+    if(siteDrawElapsed>(mobileCanvas?.14:.10)&&city.construction?.length){
       siteDrawElapsed=0;
-      const fraction=motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0;
+      const ease=Math.min(1,tweenElapsed/1.9);
+      const fraction=monthTweenStart!==null?-(1-ease)*(1-ease)
+        :!city.paused?Math.min(.999,monthElapsed*city.speed/20):0;
       renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),
-        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},fraction);
+        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},
+        fraction,animationTime,true);
     }
     renderAmbient(ambient,scene,animationTime,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
@@ -506,6 +514,22 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
   let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0,structuresCached=false;
   let siteWindow:TileWindow|null=null,siteDetail:StructureDetail|null=null;
+  let ambientFocus:{x:number;y:number}|null=null;
+  const viewFocus=()=>{
+    const px=(host.clientWidth*.5-panX)/zoom,py=(host.clientHeight*.5-panY)/zoom;
+    return {x:Math.max(0,Math.min(SIZE-1,Math.round((py/HH+px/HW)/2))),
+      y:Math.max(0,Math.min(SIZE-1,Math.round((py/HH-px/HW)/2)))};
+  };
+  const renewNeighborhood=(force=false)=>{
+    const center=viewFocus();
+    if(force||!ambientFocus
+      ||Math.abs(center.x-ambientFocus.x)+Math.abs(center.y-ambientFocus.y)>7){
+      ambientFocus=center;
+      scene=buildAmbientScene(city,center);
+      if(motionEnabled)renderAmbient(ambient,scene,animationTime,
+        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
+    }
+  };
   const refreshVisibleStructures=(force=false)=>{
     const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
     const detail=structureDetailAtZoom(zoom);
@@ -546,7 +570,8 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     siteWindow=paddedTileWindow(visible,4);siteDetail=detail;
     renderConstructionSites(worksites,city,detail,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},
-      motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0);
+      monthTweenStart!==null?-1:motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0,
+      animationTime,motionEnabled);
   };
   // Phone play starts close enough to see houses, people and traffic.
   // Players can pinch out for an overview at any time.
@@ -554,7 +579,16 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   const updateCamera=()=>{
     app.ticker.maxFPS=mobileCanvas?(zoom<.7?18:24):30;
     stage.scale.set(zoom);stage.position.set(panX,panY);
-    refreshVisibleStructures();refreshSites();
+    refreshVisibleStructures();refreshSites();renewNeighborhood();
+  };
+  const focusTile=(x:number,y:number)=>{
+    const target=tilePosition(x,y);
+    // Keep a visible chunk of the neighborhood at the chosen destination.
+    zoom=Math.max(zoom,mobileCanvas?.98:.9);
+    panX=host.clientWidth/2-target.x*zoom;
+    panY=host.clientHeight*.53-(target.y+HH)*zoom;
+    updateCamera();
+    renewNeighborhood(true);
   };
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
@@ -671,16 +705,19 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects||next.policy!==city.policy||next.month!==city.month;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
-      if(monthChanged)monthElapsed=0;
+      if(monthChanged){
+        monthElapsed=0;
+        monthTweenStart=motionEnabled&&next.month===city.month+1?animationTime:null;
+      }
       city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);refreshSites(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
       if(!visualChanged&&pausedChanged)refreshSites(true);
-      if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime,{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
+      if(ambientChanged)renewNeighborhood(true);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
     setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime,{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}refreshSites(true);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
-    resetView,zoomBy:factor=>zoomBy(factor),
+    resetView,zoomBy:factor=>zoomBy(factor),focusTile,
     destroy(){
       resizeObserver.disconnect();
       app.ticker.remove(onAnimationFrame);
