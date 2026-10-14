@@ -20,7 +20,7 @@ test('city play is one persistent map for construction, tax, policy and investme
  await tax.press('ArrowLeft');
  await expect(tax).toHaveValue('8');
  await page.getByRole('group',{name:'都市運営コマンド'}).getByRole('button',{name:'投資'}).click();
- await expect(page.getByRole('button',{name:/交通改善事業 Lv/})).toBeVisible();
+ await expect(page.getByRole('button',{name:/交通ネットワーク強化 Lv/})).toBeVisible();
  await page.getByRole('group',{name:'都市運営コマンド'}).getByRole('button',{name:'交通'}).click();
  await expect(page.getByRole('group',{name:'簡易交通分析'})).toBeVisible();
  await expect(map).toBeVisible();
