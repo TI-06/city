@@ -125,3 +125,26 @@ test('maintenance strategy changes finance expenditure and survives save/reload'
   await expect(page.getByRole('button',{name:/最低限の維持/})).toHaveAttribute('aria-pressed','true');
   expect(errors).toEqual([]);
 });
+
+test('capital investment spends city budget and survives a save/reload',async ({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',error=>errors.push(error.message));
+  page.on('dialog',dialog=>{void dialog.accept();});
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:'財政と経済'}).click();
+  await expect(page.getByText('都市の大型投資')).toBeVisible();
+  await expect(page.getByText('公共投資の運営費')).toBeVisible();
+  const card=page.locator('.capital-card').filter({hasText:'住宅負担支援'});
+  await expect(card).toContainText('Lv.0 / 3');
+  await card.getByRole('button',{name:'住宅負担支援へ投資'}).click();
+  await expect(card).toContainText('Lv.1 / 3');
+  await page.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(page.getByText('手動保存完了')).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'財政と経済'}).click();
+  await expect(page.locator('.capital-card').filter({hasText:'住宅負担支援'})).toContainText('Lv.1 / 3');
+  await page.getByRole('button',{name:'住民と人口'}).click();
+  await expect(page.getByText('支援後の家賃負担')).toBeVisible();
+  expect(errors).toEqual([]);
+});
