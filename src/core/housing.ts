@@ -1,6 +1,7 @@
 import type { City, Building } from './city';
 import type { LandAnalysis } from './land';
 import { SIZE } from './grid';
+import { capitalLevel } from './capital';
 
 /**
  * Housing occupancy is stored in Building.residents (schema v1).
@@ -17,6 +18,7 @@ export type HousingMarket = Readonly<{
   vacant: number;
   demandGap: number;
   estimatedRent: number;
+  netRent: number;
   rentBurden: number;
   affordability: number;
   monthlyMigrationEstimate: number;
@@ -55,7 +57,9 @@ export function assessHousing(
   // Empty new towns have potential wage earners rather than zero-income tenants.
   const workingShare=occupied>0?employed/occupied:Math.min(0.53,jobSlots*0.53/Math.max(12,capacity));
   const availableIncome=4+18*workingShare;
-  const rentBurden=Math.round(100*estimatedRent/availableIncome);
+  // Municipal support reduces what residents pay, not the market gross rent.
+  const netRent=Math.round(estimatedRent*(1-0.13*capitalLevel(city,'housing'))*10)/10;
+  const rentBurden=Math.round(100*netRent/availableIncome);
   const affordability=Math.round(clamp(110-1.4*Math.max(0,rentBurden-28),0,100));
   const workingPopulation=Math.round(occupied*0.53);
   const jobless=Math.max(0,workingPopulation-employed);
@@ -70,7 +74,7 @@ export function assessHousing(
   const entry=happiness>=35&&rentBurden<=95?
     Math.min(vacant,Math.max(0,Math.floor(opportunity*0.11*attraction)),8):0;
   return {
-    capacity,occupied,vacant,demandGap,estimatedRent,rentBurden,
+    capacity,occupied,vacant,demandGap,estimatedRent,netRent,rentBurden,
     affordability,monthlyMigrationEstimate:entry-departure,averageHousingLand,
   };
 }

@@ -1,4 +1,5 @@
 import { SIZE } from './grid';
+import { capitalLevel } from './capital';
 import type { Building, City } from './city';
 
 /**
@@ -140,7 +141,7 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
     const weightedWorkers = employedComp * (home.building.residents / people);
     // Traffic policy subsidizes public transport and staggered schedules.
     // Workers remain employed, but fewer equivalent peak trips use roads.
-    const peakRoadTrips = weightedWorkers * (city.policy === 'mobility' ? 0.45 : 1);
+    const peakRoadTrips = weightedWorkers * (city.policy === 'mobility' ? 0.45 : 1) * (1-0.14*capitalLevel(city,'transit'));
     routedEmployees += weightedWorkers;
     commuteDistance += weightedWorkers * distance[home.access]!;
     let road = home.access;

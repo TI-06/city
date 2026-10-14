@@ -59,3 +59,18 @@
 .maintenance-condition i{display:block;height:100%;background:linear-gradient(90deg,#d77964,#e2c968,#4ca88c);border-radius:20px}
 .finance-explainer{margin-top:12px;font-size:11px;line-height:1.75;color:#647e73}
 @media(max-width:760px){.maintenance-options{grid-template-columns:1fr}.maintenance-option{padding:11px}.maintenance-forecast{align-items:flex-start}}
+
+/* Phase 3-2 long-term city investment cards */
+.capital-panel{margin-top:20px;padding:16px;border:1px solid #dce7e2;border-radius:13px;background:#f7faf8}
+.capital-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-top:14px}
+.capital-card{display:flex;min-width:0;flex-direction:column;gap:8px;padding:13px;border:1px solid #dce7e2;border-radius:11px;background:#fff}
+.capital-card-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:5px}
+.capital-card-header strong{font-size:12px;color:#204b3a}
+.capital-card-header span{font-size:10px;color:#53866d;border:1px solid #cde6d7;padding:3px 6px;border-radius:20px;font-variant-numeric:tabular-nums}
+.capital-card p{margin:0;font-size:11px;color:#6a7e77;line-height:1.55;flex:1}
+.capital-card-foot{display:flex;flex-direction:column;gap:9px;font-size:11px;font-weight:700;color:#395950}
+.capital-invest{font-weight:700;border:0;border-radius:8px;background:#247f62;color:#fff;cursor:pointer;min-height:35px}
+.capital-invest:hover:not(:disabled){background:#1d654c}
+.capital-invest:disabled{background:#dfe7e4;color:#849990;cursor:not-allowed}
+.capital-invest:focus-visible{outline:3px solid #55b4ea;outline-offset:2px}
+@media(max-width:920px){.capital-grid{grid-template-columns:1fr}.capital-card{padding:12px}}
