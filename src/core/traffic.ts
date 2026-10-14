@@ -135,12 +135,15 @@ export function analyzeTraffic(city: City): TrafficAnalysis {
     const employedComp = employmentByComponent[home.component]!;
     if (people === 0 || employedComp <= 0 || distance[home.access]! < 0) continue;
     const weightedWorkers = employedComp * (home.building.residents / people);
+    // Traffic policy subsidizes public transport and staggered schedules.
+    // Workers remain employed, but fewer equivalent peak trips use roads.
+    const peakRoadTrips = weightedWorkers * (city.policy === 'mobility' ? 0.45 : 1);
     routedEmployees += weightedWorkers;
     commuteDistance += weightedWorkers * distance[home.access]!;
     let road = home.access;
     // Distances strictly decrease on every hop: no infinite routing loops.
     while (road >= 0) {
-      roadVolume[road] = roadVolume[road]! + weightedWorkers;
+      roadVolume[road] = roadVolume[road]! + peakRoadTrips;
       road = nextToJob[road]!;
     }
   }
