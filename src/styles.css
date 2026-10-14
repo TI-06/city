@@ -246,3 +246,21 @@
  .build-panel.dock-collapsed .mobile-build-advice{display:none}
  .app-shell[data-active-menu="build"][data-tools-open="yes"] .notice{bottom:calc(255px + env(safe-area-inset-bottom))}
 }
+
+/* Phase 5: city growth should feel like an event, not a silent number change. */
+.city-growth-moment{position:absolute;z-index:8;bottom:15px;left:12px;max-width:min(375px,calc(100% - 24px));display:flex;align-items:flex-start;gap:9px;background:#173d34ee;color:#f8fff3;border:1px solid #7bbba3;border-radius:14px;padding:12px 9px 12px 12px;box-shadow:0 9px 28px #0d2e2b70;animation:cityMomentIn .34s cubic-bezier(.17,.82,.33,1.25) both}
+.city-growth-moment .city-growth-spark{font-size:22px;color:#f7d685;line-height:1.1}
+.city-growth-moment>div{flex:1;min-width:0}
+.city-growth-moment strong{font-size:13px;color:#f9f2ca;display:block}
+.city-growth-moment p{margin:5px 0 0;font-size:11px;line-height:1.55;color:#d2e9dc}
+.city-growth-moment button{color:#eaf6ee;background:#3e6759;border-radius:8px;min-width:29px;min-height:29px;font-size:11px}
+.city-growth-moment.moment-milestone{border-color:#efd285;background:#55462deE}
+.city-growth-moment.moment-milestone .city-growth-spark{color:#ffe39a}
+@keyframes cityMomentIn{from{opacity:0;transform:translateY(18px) scale(.93)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:700px){
+  .city-growth-moment{position:fixed;bottom:calc(295px + env(safe-area-inset-bottom));left:9px;right:auto;z-index:16;max-width:min(260px,70vw);padding:10px 8px;gap:7px}
+  .city-growth-moment strong{font-size:11px}.city-growth-moment p{font-size:10px}
+  .app-shell[data-active-menu="build"][data-tools-open="no"] .city-growth-moment{bottom:calc(145px + env(safe-area-inset-bottom))}
+  .app-shell:not([data-active-menu="build"]) .city-growth-moment{bottom:calc(80px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){.city-growth-moment{animation:none}}
