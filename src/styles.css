@@ -239,3 +239,10 @@
 @media(prefers-reduced-motion:reduce){
   .build-panel,.main-panel>.data-panel,.mobile-progress-chip{animation:none!important;transition:none!important}
 }
+
+.mobile-build-advice{display:none}
+@media(max-width:700px){
+ .mobile-build-advice{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:#5c7467;font-size:10px;line-height:1.45;margin:8px 2px 0}
+ .build-panel.dock-collapsed .mobile-build-advice{display:none}
+ .app-shell[data-active-menu="build"][data-tools-open="yes"] .notice{bottom:calc(255px + env(safe-area-inset-bottom))}
+}
