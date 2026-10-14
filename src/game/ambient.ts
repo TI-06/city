@@ -91,6 +91,10 @@ export function nightLevel(seconds:number):number{
   return Math.max(0,Math.min(1,(phase-.40)*11, (0.94-phase)*13));
 }
 export function buildAmbientScene(city:City):AmbientScene {
+  const population=city.buildings.reduce((n,b)=>n+b.residents,0);
+  const jobSlots=city.buildings.reduce((n,b)=>n+b.jobs,0);
+  // An early village looks quieter; growing cities attract more trips.
+  const activity=Math.max(.18,Math.min(1,(population+jobSlots*.42)/1000));
   const volume=analyzeTraffic(city).roadVolume;
   const roads=city.roads;
   const ranked:number[]=[];
@@ -112,7 +116,7 @@ export function buildAmbientScene(city:City):AmbientScene {
     if(path.length<2)continue;
     const bus=(level>0||city.policy==='mobility')&&(k%8)<Math.min(6,level*2+(city.policy==='mobility'?2:0));
     const load=volume[i]??0;
-    const density=Math.min(.97,Math.max(.26,.38+load/180));
+    const density=Math.min(.97,Math.max(.12,.12+activity*.48+load/240));
     const travelSeconds=(bus?9:6.5)+(k%40)/10;
     const restSeconds=(bus?4:2.8)+(k%29)/10;
     const first=path[1]!;
@@ -123,10 +127,15 @@ export function buildAmbientScene(city:City):AmbientScene {
   const factories=city.buildings.filter(b=>b.kind===3).slice(0,7).map(b=>({x:b.x,y:b.y,phase:(hash(b.id,city.seed)%100)/100}));
   const parks=city.services.filter(s=>s.kind==='park').slice(0,8).map(s=>({x:s.x,y:s.y,phase:(hash(s.id,city.seed)%100)/100}));
   const occupiedBuildings=city.buildings.filter(b=>b.residents>0||b.jobs>0);
-  const pedestrians=occupiedBuildings.filter((_,i)=>i%2===0).slice(0,24).map(b=>({
+  // A fixed cap with a population-dependent count keeps movement responsive
+  // without creating hundreds of sprite objects or enlarging saves.
+  const pedestrianBudget=Math.min(24,Math.max(2,Math.round(2+population/38+jobSlots/140)));
+  const candidates=[...occupiedBuildings].sort((a,b)=>hash(a.id,city.seed)-hash(b.id,city.seed)||a.id-b.id);
+  const pedestrians=candidates.slice(0,pedestrianBudget).map(b=>({
     x:b.x,y:b.y,phase:(hash(b.id,city.seed)%100)/100,duration:3+(b.id%5),residents:b.residents
   }));
-  const windows=occupiedBuildings.filter((_,i)=>i%3===0).slice(0,32).map(b=>({
+  const windowBudget=Math.min(32,Math.max(4,Math.round(6+population/35)));
+  const windows=candidates.slice(0,windowBudget).map(b=>({
     x:b.x,y:b.y,phase:(hash(b.id+1000,city.seed)%100)/100
   }));
   const water:AmbientPoint[]=[];
