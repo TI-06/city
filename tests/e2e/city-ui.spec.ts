@@ -170,3 +170,27 @@ test('austerity and borrowing are available on desktop/mobile and saved safely',
   await expect(page.getByText('財政再建・市債')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('ambient map animations can be toggled on both desktop and mobile',async ({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  const pause=page.getByRole('button',{name:'演出を停止'});
+  await expect(pause).toHaveAttribute('aria-pressed','true');
+  await pause.click();
+  const resume=page.getByRole('button',{name:'演出を再開'});
+  await expect(resume).toHaveAttribute('aria-pressed','false');
+  await resume.click();
+  await expect(page.getByRole('button',{name:'演出を停止'})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.map-host canvas')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
+test('OS reduced-motion preference disables ambient animation by default',async ({page})=>{
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await expect(page.getByRole('button',{name:'演出を再開'})).toHaveAttribute('aria-pressed','false');
+});

@@ -1,4 +1,5 @@
-import { Application, Container, Graphics } from 'pixi.js';
+import { Application, Container, Graphics, type Ticker } from 'pixi.js';
+import { buildAmbientScene, type AmbientScene } from './ambient';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { analyzeLand } from '../core/land';
@@ -110,6 +111,43 @@ function renderStructures(g:Graphics,city:City){
     }
   }
 }
+/**
+ * Draw only ~60 ephemeral objects per 30fps step; the 4,096 world tiles
+ * remain cached in their original Graphics objects.
+ */
+function renderAmbient(g:Graphics,scene:AmbientScene,time:number){
+  g.clear();
+  for(const lane of scene.lanes){
+    const t=(1+Math.sin(time*2*Math.PI/lane.period+lane.phase*6.283))/2;
+    const a=tilePosition(lane.x,lane.y),b=tilePosition(lane.toX,lane.toY);
+    const px=a.x+(b.x-a.x)*t,py=a.y+(b.y-a.y)*t+HH;
+    g.ellipse(px+1,py+3,lane.bus?7:4.5,lane.bus?3:2.6).fill({color:0x203b41,alpha:.19});
+    g.ellipse(px,py,lane.bus?6:3.8,lane.bus?2.9:2.1)
+      .fill({color:lane.bus?0x56d3f1:0xf5e6b6,alpha:.98});
+    if(lane.bus)g.circle(px+1,py,1).fill({color:0xffffff,alpha:.85});
+  }
+  for(const f of scene.factories){
+    const p=tilePosition(f.x,f.y);
+    for(let i=0;i<3;i++){
+      const progress=(time*.21+f.phase+i/3)%1;
+      g.circle(p.x+16+progress*13,p.y-28-progress*27,2.3+progress*4.3)
+        .fill({color:0xe8e9e6,alpha:.33*(1-progress)});
+    }
+  }
+  for(const park of scene.parks){
+    const p=tilePosition(park.x,park.y);
+    const wobble=time*1.2+park.phase*6.28;
+    g.circle(p.x+Math.sin(wobble)*8,p.y+HH-4+Math.cos(wobble*1.7)*5,2)
+      .fill({color:0xffe8a0,alpha:.7});
+  }
+  for(const water of scene.water){
+    const p=tilePosition(water.x,water.y);
+    const alpha=.12+.24*(.5+.5*Math.sin(time*1.5+water.phase*6.28));
+    const offset=Math.sin(time*.7+water.phase*9)*5;
+    g.moveTo(p.x-9+offset,p.y+HH-2).lineTo(p.x+3+offset,p.y+HH-5)
+      .stroke({color:0xe3fcfd,width:1.6,alpha});
+  }
+}
 function renderTrafficHeatmap(g:Graphics, city:City){
   g.clear();
   const traffic=analyzeTraffic(city);
@@ -155,6 +193,7 @@ export type MapController = {
   setMode:(mode:InteractionMode)=>void;
   setTrafficView:(enabled:boolean)=>void;
   setLandView:(enabled:boolean)=>void;
+  setMotion:(enabled:boolean)=>void;
   resetView:()=>void;
   zoomBy:(factor:number)=>void;
   destroy:()=>void;
@@ -163,10 +202,20 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   const app=new Application();
   await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',resolution:Math.min(window.devicePixelRatio||1,2)});
   const stage=new Container();
-  const terrain=new Graphics(),structures=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
-  stage.addChild(terrain,structures,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
+  const terrain=new Graphics(),structures=new Graphics(),ambient=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
+  stage.addChild(terrain,structures,ambient,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
   app.canvas.style.touchAction='none';
   let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false,landVisible=false;
+  let scene=buildAmbientScene(initial),motionEnabled=!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  let animationTime=0,frameBudget=0;
+  const onAnimationFrame=(ticker:Ticker)=>{
+    if(!motionEnabled||document.hidden)return;
+    frameBudget+=Math.min(75,ticker.deltaMS);
+    if(frameBudget<33)return;
+    animationTime+=Math.min(0.075,frameBudget/1000);frameBudget=0;
+    renderAmbient(ambient,scene,animationTime);
+  };
+  app.ticker.add(onAnimationFrame);
   let zoom=.85,panX=0,panY=0;
   const resetView=()=>{zoom=Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);};
@@ -176,7 +225,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     const worldX=(cx-panX)/zoom,worldY=(cy-panY)/zoom;
     panX=cx-worldX*next;panY=cy-worldY*next;zoom=next;updateCamera();
   };
-  renderTerrain(terrain,city);renderStructures(structures,city);resetView();
+  renderTerrain(terrain,city);renderStructures(structures,city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);resetView();
   let down:{pointer:number;originX:number;originY:number;panX:number;panY:number;action:'pan'|'paint';path:TilePoint[];moved:boolean}|null=null;
   const point=(e:PointerEvent)=>hitTile(app.canvas,e.clientX,e.clientY,panX,panY,zoom);
   const local=(e:PointerEvent|WheelEvent)=>{const r=app.canvas.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
@@ -225,13 +274,17 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
-      city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}updateOverlay();},
+      const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects;
+      city=next;if(mapChanged)renderTerrain(terrain,city);if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
+      if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);}updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
+    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else ambient.clear();},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
+      app.ticker.remove(onAnimationFrame);
       app.canvas.removeEventListener('pointerdown',pointerDown);app.canvas.removeEventListener('pointermove',pointerMove);
       app.canvas.removeEventListener('pointerup',pointerUp);app.canvas.removeEventListener('pointercancel',pointerCancel);
       app.canvas.removeEventListener('lostpointercapture',lostCapture);app.canvas.removeEventListener('pointerleave',leave);
