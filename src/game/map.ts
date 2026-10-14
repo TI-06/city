@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js';
 import { buildAmbientScene, type AmbientScene } from './ambient';
-import {visibleTileWindow,paddedTileWindow,needsTileWindowRefresh,structureDetailAtZoom,type TileWindow,type StructureDetail} from './viewport';
+import {visibleTileWindow,paddedTileWindow,needsTileWindowRefresh,structureDetailAtZoom,tileNearViewport,type TileWindow,type StructureDetail} from './viewport';
 import {appendGrowthPulses,detectGrowthEvents,visualMood,type CityMood,type GrowthPulse} from './visual-state';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
@@ -69,14 +69,18 @@ function renderTerrain(g:Graphics,city:City){
     if(v%12===0){g.circle(p.x-10,p.y+HH-2,1.5).fill({color:0xcad5a1,alpha:.6});}
   }
 }
-function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:StructureDetail){
+function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:StructureDetail,
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number}):number{
   g.clear();
-  if(!window)return;
+  if(!window)return 0;
+  let renderedTiles=0;
   const buildings=new Map(city.buildings.map(b=>[tileIndex(b.x,b.y),b]));
   const services=new Map(city.services.map(s=>[tileIndex(s.x,s.y),s]));
   for(let sum=window.minX+window.minY;sum<=window.maxX+window.maxY;sum++)
     for(let y=Math.max(window.minY,sum-window.maxX);y<=Math.min(window.maxY,sum-window.minX);y++){
     const x=sum-y,i=tileIndex(x,y);
+    if(!tileNearViewport(x,y,viewport.width,viewport.height,viewport.panX,viewport.panY,viewport.zoom))continue;
+    renderedTiles++;
     if(city.land[i]===0)continue;
     const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i);
     if(city.zones[i]){
@@ -118,6 +122,7 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
       drawTree(g,p.x-2,p.y+9,v);
     }
   }
+  return renderedTiles;
 }
 /**
  * Draw only ~60 ephemeral objects per 30fps step; the 4,096 world tiles
@@ -257,14 +262,19 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   };
   app.ticker.add(onAnimationFrame);
   let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
-  let renderedDetail:StructureDetail|null=null;
+  let renderedDetail:StructureDetail|null=null,structureBuilds=0;
   const refreshVisibleStructures=(force=false)=>{
     const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
     const detail=structureDetailAtZoom(zoom);
     if(!force&&detail===renderedDetail&&!needsTileWindowRefresh(renderedWindow,visible))return;
     renderedWindow=paddedTileWindow(visible,8);
     renderedDetail=detail;
-    renderStructures(structures,city,renderedWindow,detail);
+    const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
+      {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
+    structureBuilds++;
+    app.canvas.dataset.structureTiles=String(renderedTiles);
+    app.canvas.dataset.structureDetail=detail;
+    app.canvas.dataset.structureBuilds=String(structureBuilds);
   };
   const resetView=()=>{zoom=Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();};
