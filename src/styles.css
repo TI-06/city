@@ -350,3 +350,17 @@
 @media(max-width:390px) and (max-height:740px){
   .map-quick-menu.is-open .map-quick-body{max-height:39dvh}
 }
+
+/* Visible city growth: construction is a destination, not a hidden statistic. */
+.map-construction-focus{position:absolute;top:65px;right:10px;z-index:8;display:flex;align-items:center;gap:7px;padding:10px 11px;border:1px solid #f8d489;border-radius:12px;background:#315943ee;color:#fff4d8;font-size:11px;box-shadow:0 7px 22px #183b3280;touch-action:manipulation;max-width:calc(100% - 20px)}
+.map-construction-focus strong{font-size:11px;color:#ffe7a0}
+.construction-pulse-dot{width:8px;height:8px;flex:none;border-radius:100%;background:#ffdb6c;box-shadow:0 0 0 0 #ffdb6c66;animation:siteActivityPulse 2.2s ease-out infinite}
+.city-growth-moment .growth-jump{margin:7px 0 0;padding:7px 10px;min-height:30px;border:1px solid #f5da9b;border-radius:7px;background:#e9bf69;color:#303d35;font-size:11px;font-weight:800}
+@keyframes siteActivityPulse{0%{box-shadow:0 0 0 0 #ffdb6c77}70%{box-shadow:0 0 0 8px #ffdb6c00}100%{box-shadow:0 0 0 0 #ffdb6c00}}
+@media(max-width:700px){
+  .map-construction-focus{top:68px;right:7px;max-width:210px;min-height:39px;font-size:10px;padding:8px 9px;gap:5px}
+  .map-construction-focus strong{font-size:10px}
+  .city-growth-moment .growth-jump{min-height:34px;font-size:10px}
+}
+@media(max-width:390px){.map-construction-focus{top:76px;right:6px;max-width:180px;font-size:9px}}
+@media(prefers-reduced-motion:reduce){.construction-pulse-dot{animation:none}}

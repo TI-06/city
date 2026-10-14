@@ -13,6 +13,7 @@ describe('observable city story',()=>{
     expect(story?.kind).toBe('redevelopment');
     expect(story?.title).toContain(getBuildingStyle(old,next.seed).label);
     expect(story?.detail).toContain('Lv.');
+    expect(story?.point).toEqual({x:old.x,y:old.y});
     expect(buildingStyleLabel(next,old.x,old.y)).toBe(getBuildingStyle(old,next.seed).label);
     expect(existing.height).toBeLessThan(getBuildingStyle(old,next.seed).height);
   });
@@ -22,6 +23,7 @@ describe('observable city story',()=>{
     after.month=1;
     after.buildings.push({id:after.nextId++,x:2,y:2,kind:1,level:1,residents:0,jobs:0});
     expect(getCityMoment(before,after)?.kind).toBe('construction');
+    expect(getCityMoment(before,after)?.point).toEqual({x:2,y:2});
     expect(getCityMoment(before,{...before,month:1,funds:before.funds+100})).toBeNull();
     expect(getCityMoment(before,before)).toBeNull();
   });

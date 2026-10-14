@@ -90,7 +90,10 @@ export function nightLevel(seconds:number):number{
   const phase=((seconds%72)+72)%72/72;
   return Math.max(0,Math.min(1,(phase-.40)*11, (0.94-phase)*13));
 }
-export function buildAmbientScene(city:City):AmbientScene {
+export function buildAmbientScene(city:City,focus?:Readonly<{x:number;y:number}>):AmbientScene {
+  // Focus is visual/camera state only: the same city save always produces the
+  // same deterministic activity at the same viewpoint, without persisting agents.
+  const distance=(x:number,y:number)=>focus?Math.abs(x-focus.x)+Math.abs(y-focus.y):0;
   const population=city.buildings.reduce((n,b)=>n+b.residents,0);
   const jobSlots=city.buildings.reduce((n,b)=>n+b.jobs,0);
   // An early village looks quieter; growing cities attract more trips.
@@ -103,7 +106,8 @@ export function buildAmbientScene(city:City):AmbientScene {
     ranked.push(i);
   }
   ranked.sort((a,b)=>{
-    const score=(i:number)=>Math.min(140,volume[i]??0)*10+(hash(i,city.seed)%700);
+    const score=(i:number)=>Math.min(140,volume[i]??0)*10+(hash(i,city.seed)%700)
+      +(focus?Math.max(0,24-distance(i%SIZE,Math.floor(i/SIZE)))*2500:0);
     return score(b)-score(a)||a-b;
   });
   const lanes:AmbientLane[]=[];
@@ -116,21 +120,27 @@ export function buildAmbientScene(city:City):AmbientScene {
     if(path.length<2)continue;
     const bus=(level>0||city.policy==='mobility')&&(k%8)<Math.min(6,level*2+(city.policy==='mobility'?2:0));
     const load=volume[i]??0;
-    const density=Math.min(.97,Math.max(.12,.12+activity*.48+load/240));
+    const density=Math.min(.98,Math.max(.28,.32+activity*.47+load/230));
     const travelSeconds=(bus?9:6.5)+(k%40)/10;
-    const restSeconds=(bus?4:2.8)+(k%29)/10;
+    const restSeconds=(bus?2.5:1.3)+(k%19)/10;
     const first=path[1]!;
     lanes.push({x:start.x,y:start.y,toX:first.x,toY:first.y,
       phase:(k%791)/791,period:travelSeconds+restSeconds,
       route:path,alternate,travelSeconds,restSeconds,density,bus});
   }
-  const factories=city.buildings.filter(b=>b.kind===3).slice(0,7).map(b=>({x:b.x,y:b.y,phase:(hash(b.id,city.seed)%100)/100}));
-  const parks=city.services.filter(s=>s.kind==='park').slice(0,8).map(s=>({x:s.x,y:s.y,phase:(hash(s.id,city.seed)%100)/100}));
+  const closeFirst=<T extends {x:number;y:number}>(items:T[])=>focus?
+    items.sort((a,b)=>distance(a.x,a.y)-distance(b.x,b.y)||a.x-b.x||a.y-b.y):items;
+  const factories=closeFirst(city.buildings.filter(b=>b.kind===3)).slice(0,7)
+    .map(b=>({x:b.x,y:b.y,phase:(hash(b.id,city.seed)%100)/100}));
+  const parks=closeFirst(city.services.filter(s=>s.kind==='park')).slice(0,8)
+    .map(s=>({x:s.x,y:s.y,phase:(hash(s.id,city.seed)%100)/100}));
   const occupiedBuildings=city.buildings.filter(b=>b.residents>0||b.jobs>0);
   // A fixed cap with a population-dependent count keeps movement responsive
   // without creating hundreds of sprite objects or enlarging saves.
   const pedestrianBudget=Math.min(24,Math.max(2,Math.round(2+population/38+jobSlots/140)));
-  const candidates=[...occupiedBuildings].sort((a,b)=>hash(a.id,city.seed)-hash(b.id,city.seed)||a.id-b.id);
+  const candidates=[...occupiedBuildings].sort((a,b)=>
+    (focus?distance(a.x,a.y)-distance(b.x,b.y):0)
+    ||hash(a.id,city.seed)-hash(b.id,city.seed)||a.id-b.id);
   const pedestrians=candidates.slice(0,pedestrianBudget).map(b=>({
     x:b.x,y:b.y,phase:(hash(b.id,city.seed)%100)/100,duration:3+(b.id%5),residents:b.residents
   }));

@@ -135,7 +135,7 @@ function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,de
 /** A construction site stays on the map for entire game months.
  * The silhouette and stage depend on the saved month, not frame animation.
  */
-function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail,monthFraction=0){
+function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:StructureDetail,monthFraction=0,seconds=0,animated=true){
   const p=tilePosition(site.x,site.y),t=constructionProgress(site,city.month+monthFraction);
   const phase=constructionPhase(site,city.month+monthFraction);
   const target:Building={id:site.id,x:site.x,y:site.y,kind:site.kind,level:site.level,residents:0,jobs:0};
@@ -158,8 +158,39 @@ function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:Struct
     .stroke({color:0xf5bc62,width:1.6,alpha:.9});
   g.moveTo(p.x-20,p.y+HH+4).lineTo(p.x+19,p.y+HH+4)
     .stroke({color:0xe1b477,width:1.4,alpha:.75});
+  const swing=animated?Math.sin(seconds*1.8+site.id*2.3)*6:0;
   g.moveTo(p.x+19,top-11).lineTo(p.x-7,top-11).stroke({color:0xfce1a3,width:2.4});
-  g.moveTo(p.x-4,top-11).lineTo(p.x-4,top+1).stroke({color:0xb59b75,width:1.1});
+  g.moveTo(p.x-4+swing,top-11).lineTo(p.x-4+swing,top+7)
+    .stroke({color:0xb59b75,width:1.1});
+  g.poly([p.x-6+swing,top+6,p.x-2+swing,top+6,p.x-4+swing,top+9])
+    .fill(0xf3ba53);
+  if(animated){
+    // Small delivery trips and site workers make construction visibly active
+    // even when the player advances individual months while paused.
+    const trip=((seconds*.23+site.id*.131)%1+1)%1;
+    if(trip<.87){
+      const truckX=p.x-28+trip*49,y=p.y+HH*2+5;
+      g.roundRect(truckX,y-5,11,6,1.5).fill(0xeb9a40);
+      g.rect(truckX+7,y-8,4,4).fill(0xffe1a1);
+      g.circle(truckX+2,y+2,1.8).fill(0x343d43);
+      g.circle(truckX+9,y+2,1.8).fill(0x343d43);
+    }
+    for(let i=0;i<2;i++){
+      const walk=Math.sin(seconds*(1.1+i*.27)+site.id+i*2)*4;
+      const px=p.x+(i===0?-14:11)+walk,py=p.y+HH+10+(i===0?0:3);
+      g.circle(px,py-5,2.2).fill(0xffd578);
+      g.rect(px-1.8,py-2.8,3.6,4).fill(i===0?0xe9a442:0x77acd0);
+      g.moveTo(px,py+1).lineTo(px+Math.sin(seconds*3+i)*1.7,py+4)
+        .stroke({color:0x344f55,width:1.1});
+    }
+    const dust=((seconds*.35+site.id*.271)%1+1)%1;
+    if(dust<.7&&phase!=='finishing'){
+      const rise=dust/.7;
+      for(let i=0;i<2;i++)
+        g.circle(p.x-9+i*12+rise*3,p.y+HH+2-rise*15,3+rise*3)
+          .fill({color:0xe9d3a9,alpha:(1-rise)*.27});
+    }
+  }
   const barX=p.x-15,barY=p.y+HH*2+10;
   g.roundRect(barX,barY,30,5,2).fill(0x284d42);
   g.roundRect(barX,barY,Math.max(2,30*t),5,2).fill(0xffcc70);
@@ -173,12 +204,14 @@ function renderWorkSite(g:Graphics,city:City,site:ConstructionSite,detail:Struct
  * Culling keeps worksite meshes bounded to what the player can see.
  */
 function renderConstructionSites(g:Graphics,city:City,detail:StructureDetail,
-  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},fraction:number){
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},fraction:number,seconds=0,animated=true){
   g.clear();
+  let drawn=0;
   for(const site of city.construction??[]){
     if(!tileNearViewport(site.x,site.y,viewport.width,viewport.height,
       viewport.panX,viewport.panY,viewport.zoom,260))continue;
-    renderWorkSite(g,city,site,detail,fraction);
+    renderWorkSite(g,city,site,detail,fraction,seconds,animated);
+    if(++drawn>=16)break; // A bounded live-construction layer on low-end devices.
   }
 }
 function renderTerrain(g:Graphics,city:City){
@@ -428,6 +461,7 @@ export type MapController = {
   setMotion:(enabled:boolean)=>void;
   resetView:()=>void;
   zoomBy:(factor:number)=>void;
+  focusTile:(x:number,y:number)=>void;
   destroy:()=>void;
 };
 export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:readonly TilePoint[])=>void):Promise<MapController>{
@@ -436,7 +470,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   await app.init({resizeTo:host,backgroundColor:0xbad4bf,antialias:true,preference:'webgl',
     resolution:Math.min(window.devicePixelRatio||1,mobileCanvas?1.5:2)});
   // Avoid 60 high-cost full-stage renders each second for a slowly moving city.
-  app.ticker.maxFPS=mobileCanvas?24:30;
+  app.ticker.maxFPS=30;
   const stage=new Container();
   const terrain=new Graphics(),structures=new Graphics(),worksites=new Graphics(),ambient=new Graphics(),cityEffects=new Graphics(),landHeatmap=new Graphics(),trafficHeatmap=new Graphics(),overlay=new Graphics();
   stage.addChild(terrain,structures,worksites,ambient,cityEffects,landHeatmap,trafficHeatmap,overlay);app.stage.addChild(stage);host.appendChild(app.canvas);
@@ -444,20 +478,28 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   let city=initial,selection:TilePoint|null=null,hover:TilePoint|null=null,tool:Tool='inspect',mode:InteractionMode='pan',trafficVisible=false,landVisible=false;
   let scene=buildAmbientScene(initial),mood=visualMood(initial),pulses:GrowthPulse[]=[],motionEnabled=!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   let animationTime=0,frameBudget=0,monthElapsed=0,siteDrawElapsed=0;
+  // Month-step animations use a transient 1.9s visual catch-up. Saves still
+  // advance atomically, but a paused player can now SEE foundations rise.
+  let monthTweenStart:number|null=null;
   const onAnimationFrame=(ticker:Ticker)=>{
     if(!motionEnabled||document.hidden)return;
     frameBudget+=Math.min(75,ticker.deltaMS);
-    if(frameBudget<(mobileCanvas?42:33))return;
+    if(frameBudget<33)return;
     const elapsed=Math.min(0.075,frameBudget/1000);animationTime+=elapsed;frameBudget=0;
     if(!city.paused){
       monthElapsed=Math.min(20/Math.max(1,city.speed),monthElapsed+elapsed);
     }
     siteDrawElapsed+=elapsed;
-    if(siteDrawElapsed>(mobileCanvas?0.16:0.11) && !city.paused && city.construction?.length){
+    const tweenElapsed=monthTweenStart===null?Infinity:animationTime-monthTweenStart;
+    if(monthTweenStart!==null&&tweenElapsed>=1.9)monthTweenStart=null;
+    if(siteDrawElapsed>(mobileCanvas?0.14:0.10)&&city.construction?.length){
       siteDrawElapsed=0;
-      const fraction=motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0;
+      const ease=Math.min(1,tweenElapsed/1.9);
+      const fraction=monthTweenStart!==null?-(1-ease)*(1-ease)
+        :!city.paused?Math.min(.999,monthElapsed*city.speed/20):0;
       renderConstructionSites(worksites,city,structureDetailAtZoom(zoom),
-        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},fraction);
+        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},
+        fraction,animationTime,true);
     }
     renderAmbient(ambient,scene,animationTime,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
@@ -472,6 +514,22 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
   let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0,structuresCached=false;
   let siteWindow:TileWindow|null=null,siteDetail:StructureDetail|null=null;
+  let ambientFocus:{x:number;y:number}|null=null;
+  const viewFocus=()=>{
+    const px=(host.clientWidth*.5-panX)/zoom,py=(host.clientHeight*.5-panY)/zoom;
+    return {x:Math.max(0,Math.min(SIZE-1,Math.round((py/HH+px/HW)/2))),
+      y:Math.max(0,Math.min(SIZE-1,Math.round((py/HH-px/HW)/2)))};
+  };
+  const renewNeighborhood=(force=false)=>{
+    const center=viewFocus();
+    if(force||!ambientFocus
+      ||Math.abs(center.x-ambientFocus.x)+Math.abs(center.y-ambientFocus.y)>7){
+      ambientFocus=center;
+      scene=buildAmbientScene(city,center);
+      if(motionEnabled)renderAmbient(ambient,scene,animationTime,
+        {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
+    }
+  };
   const refreshVisibleStructures=(force=false)=>{
     const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
     const detail=structureDetailAtZoom(zoom);
@@ -512,15 +570,26 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     siteWindow=paddedTileWindow(visible,4);siteDetail=detail;
     renderConstructionSites(worksites,city,detail,
       {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},
-      motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0);
+      monthTweenStart!==null?-1:motionEnabled&&!city.paused?Math.min(.999,monthElapsed*city.speed/20):0,
+      animationTime,motionEnabled);
   };
   // Phone play starts close enough to see houses, people and traffic.
   // Players can pinch out for an overview at any time.
   const resetView=()=>{zoom=mobileCanvas?0.78:Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
   const updateCamera=()=>{
-    app.ticker.maxFPS=mobileCanvas?(zoom<.7?18:24):30;
+    app.ticker.maxFPS=mobileCanvas&&zoom<.7?24:30;
     stage.scale.set(zoom);stage.position.set(panX,panY);
-    refreshVisibleStructures();refreshSites();
+    refreshVisibleStructures();refreshSites();renewNeighborhood();
+  };
+  const focusTile=(x:number,y:number)=>{
+    const target=tilePosition(x,y);
+    // Keep a visible chunk of the neighborhood at the chosen destination.
+    zoom=Math.max(zoom,mobileCanvas?0.98:0.9);
+    panX=host.clientWidth/2-target.x*zoom;
+    panY=host.clientHeight*.53-(target.y+HH)*zoom;
+    updateCamera();
+    app.canvas.dataset.focusedTile=`${x},${y}`;
+    renewNeighborhood(true);
   };
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
@@ -637,16 +706,19 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects||next.policy!==city.policy||next.month!==city.month;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
-      if(monthChanged)monthElapsed=0;
+      if(monthChanged){
+        monthElapsed=0;
+        monthTweenStart=motionEnabled&&next.month===city.month+1?animationTime:null;
+      }
       city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);refreshSites(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
       if(!visualChanged&&pausedChanged)refreshSites(true);
-      if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime,{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
+      if(ambientChanged)renewNeighborhood(true);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
     setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime,{width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}refreshSites(true);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
-    resetView,zoomBy:factor=>zoomBy(factor),
+    resetView,zoomBy:factor=>zoomBy(factor),focusTile,
     destroy(){
       resizeObserver.disconnect();
       app.ticker.remove(onAnimationFrame);
