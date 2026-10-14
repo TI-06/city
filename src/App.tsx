@@ -78,6 +78,11 @@ export function App(){
   const waiting=development.pending.home+development.pending.shop+development.pending.industry;
   const activeSites=city.construction??[];
   const nextCompletion=activeSites.length?Math.min(...activeSites.map(s=>s.startMonth+s.duration-city.month)):null;
+  const focusSite=activeSites.length?
+    [...activeSites].sort((a,b)=>(a.startMonth+a.duration)-(b.startMonth+b.duration)||a.id-b.id)[0]:null;
+  const viewConstruction=()=>{if(!focusSite)return;setMapQuickOpen(false);mapRef.current?.focusTile(focusSite.x,focusSite.y);
+    setMessage(`工事現場に移動しました（完成まであと${Math.max(0,focusSite.startMonth+focusSite.duration-city.month)}か月）`);
+  };
   const readyToBuild=development.ready.home+development.ready.shop+development.ready.industry;
   const developmentHint=development.pausedByHappiness?'住民満足度が40未満のため、民間開発が止まっています。税率や公共サービスを見直しましょう。'
     :waiting===0?(activeSites.length>0?`工事中の建物が${activeSites.length}件あります。あと${nextCompletion}か月で次の建物が完成します。`:development.disconnected>0?'道路から切り離された開発地区があります。道路をつなぎ直してください。':'開発待ちの地区がありません。道路沿いの空き地に住宅・商業・工業地区を指定しましょう。')
@@ -276,8 +281,17 @@ export function App(){
               </div>
             </div>}
           </div>}
+          {active==='build'&&focusSite&&<button type="button" className="map-construction-focus"
+            onClick={viewConstruction} aria-label="工事現場へ移動する">
+            <span className="construction-pulse-dot"/> 🏗 工事中 {activeSites.length}件 <strong>現場を見る ↗</strong>
+          </button>}
           {cityMoment&&<div key={cityMoment.key} className={`city-growth-moment moment-${cityMoment.kind}`} role="status">
-            <span className="city-growth-spark">✦</span><div><strong>{cityMoment.title}</strong><p>{cityMoment.detail}</p></div>
+            <span className="city-growth-spark">✦</span><div><strong>{cityMoment.title}</strong><p>{cityMoment.detail}</p>
+              {cityMoment.point&&<button type="button" className="growth-jump"
+                onClick={()=>{mapRef.current?.focusTile(cityMoment.point!.x,cityMoment.point!.y);setMapQuickOpen(false);}}>
+                発展した場所を見る ↗
+              </button>}
+            </div>
             <button type="button" onClick={()=>setCityMoment(null)} aria-label="成長のお知らせを閉じる">✕</button>
           </div>}
           {active==='build'&&<div className="mobile-progress-chip" role="status"><span>🏗 工事中 {activeSites.length}件</span><span>開発可能 {readyToBuild}区画 · 建築待ち {waiting}区画</span></div>}
