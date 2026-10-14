@@ -109,6 +109,34 @@ export function getStats(city:City):Stats {
   const balance=operatingBalance-debt.principal;
   return {population,jobs,employed,vacancies,happiness:adjustedHappiness,income,expenses,balance,homes:city.buildings.filter(b=>b.kind===1).length,roads,commerce,industry,green,arterialRoads,roadComponents:traffic.roadComponents,disconnectedResidents:traffic.inaccessibleResidents,roadlessJobs:traffic.roadlessJobs,congestion:traffic.congestion,congestedRoads:traffic.congestedRoads,averageCommute:traffic.averageCommute,worstRoadLoad:traffic.worstRoadLoad,trafficProductivity:traffic.productivity,housingCapacity:housing.capacity,housingVacancies:housing.vacant,housingDemandGap:housing.demandGap,estimatedRent:housing.estimatedRent,rentBurden:housing.rentBurden,affordability:housing.affordability,expectedMigration:housing.monthlyMigrationEstimate,renewalDue:lifecycle.renewalDue,renewalSpending:lifecycle.renewalSpend,maintenanceBacklog:lifecycle.backlog,projectedMaintenanceBacklog:lifecycle.nextBacklog,infrastructureCondition:lifecycle.condition,matureCityServices:lifecycle.maturityServices,maintenancePlan:lifecycle.plan,capitalOperating,netRent:housing.netRent,fiscalMode:fiscalMode(city),publicSavings,outstandingDebt:debt.debt,debtLimit:debt.limit,debtHeadroom:debt.headroom,debtInterest:debt.interest,debtPrincipal:debt.principal,operatingBalance,debtService:debt.interest+debt.principal};
 }
+export type DevelopmentCounts = {home:number;shop:number;industry:number};
+export type DevelopmentOutlook = {
+  pending:DevelopmentCounts; ready:DevelopmentCounts; disconnected:number;
+  pausedByHappiness:boolean;
+};
+function canDevelopKind(kind:Exclude<Zone,0>,stats:Stats):boolean{
+  if(stats.happiness<40)return false;
+  if(kind===1)return stats.housingCapacity===0||stats.housingVacancies<=Math.max(24,Math.round(stats.population*.18));
+  return stats.vacancies<=Math.max(35,Math.round(stats.population*.53*.30));
+}
+/** Explain why zoned land has not produced visible buildings yet.
+ * Derived only from current city state, with no added save data.
+ */
+export function getDevelopmentOutlook(city:City,stats:Stats=getStats(city)):DevelopmentOutlook{
+  const pending:DevelopmentCounts={home:0,shop:0,industry:0};
+  const ready:DevelopmentCounts={home:0,shop:0,industry:0};
+  const occupied=new Set(city.buildings.map(b=>idx(b.x,b.y)));
+  let disconnected=0;
+  for(let y=0;y<SIZE;y++)for(let x=0;x<SIZE;x++){
+    const i=idx(x,y),kind=city.zones[i];
+    if(!kind||occupied.has(i))continue;
+    if(!adjacent(city,x,y)){disconnected++;continue;}
+    const key=kind===1?'home':kind===2?'shop':'industry';
+    pending[key]++;
+    if(canDevelopKind(kind as Exclude<Zone,0>,stats))ready[key]++;
+  }
+  return {pending,ready,disconnected,pausedByHappiness:stats.happiness<40};
+}
 const historyEntry=(city:City):History=>{const s=getStats(city);return {month:city.month,population:s.population,funds:city.funds,income:s.income,expense:s.expenses,happiness:s.happiness};};
 export type CommandResult = {ok:true;changed:boolean;message:string;city:City}|{ok:false;changed:false;message:string;city:City};
 /** Command is atomic: invalid operations never modify the input world. */
@@ -230,10 +258,7 @@ export function advanceMonths(current:City,count=1):City{
     }
     const growth=Math.min(3,Math.max(0,Math.floor(stats.happiness/40)));
     // Demand-aware construction: avoid a speculative flood of empty housing/factories.
-    const eligible=candidates.filter(c=>{
-      if(c.kind===1)return stats.housingCapacity===0 || stats.housingVacancies<=Math.max(24,Math.round(stats.population*0.18));
-      return stats.vacancies<=Math.max(35,Math.round(stats.population*.53*.30));
-    });
+    const eligible=candidates.filter(c=>canDevelopKind(c.kind,stats));
     const landValues=eligible.length?analyzeLand(city).values:null;
     for(let j=0;j<growth&&eligible.length;j++){
       if(stats.happiness<40 && stepRandom(city)>0.25)continue;
