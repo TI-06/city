@@ -8,13 +8,20 @@ describe('evolving skyline (visual-only schema 1)',()=>{
     const labels=new Set<string>();
     for(const kind of [1,2,3] as const)for(const level of [1,2,3]){
       const style=getBuildingStyle(building(kind,level),12937);
+      // Neighborhood variety is defined across blocks/seeds, not necessarily
+      // all alternative archetypes at a single fixed (x,y) tile.
+      for(const seed of [17,12937,9993,211]){
+        for(const [x,y] of [[21,27],[5,5],[32,41],[14,37]]){
+          labels.add(getBuildingStyle({...building(kind,level),x,y},seed).name);
+        }
+      }
       expect(style.height).toBeGreaterThan(0);
       expect(style.roof).toBeGreaterThan(0);
       labels.add(style.name);
       if(kind===1&&level===1)expect(['cottage','townhouse']).toContain(style.name);
       if(kind===1&&level===3)expect(['apartment','residential-tower']).toContain(style.name);
     }
-    expect(labels.size).toBeGreaterThanOrEqual(8);
+    expect(labels.size).toBeGreaterThanOrEqual(9);
     expect(getBuildingStyle(building(1,3),999).height).toBeGreaterThan(getBuildingStyle(building(1,1),999).height);
     expect(getBuildingStyle(building(2,3),999).height).toBeGreaterThan(getBuildingStyle(building(2,1),999).height);
   });
