@@ -1,7 +1,7 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js';
 import { buildAmbientScene, sampleVehicle, sampleWalker, nightLevel, type AmbientScene } from './ambient';
 import {visibleTileWindow,paddedTileWindow,needsTileWindowRefresh,structureDetailAtZoom,tileNearViewport,type TileWindow,type StructureDetail} from './viewport';
-import {appendGrowthPulses,detectGrowthEvents,visualMood,type CityMood,type GrowthPulse} from './visual-state';
+import {appendGrowthPulses,detectGrowthEvents,visualMood,constructionStage,CONSTRUCTION_SECONDS,type CityMood,type GrowthPulse} from './visual-state';
 import { canPlaceAt, type City, type Building, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
 import { analyzeLand } from '../core/land';
@@ -58,12 +58,15 @@ function buildingBox(g:Graphics,x:number,y:number,h:number,top:number,left:numbe
 /** Draw distinct skylines per district and level; only derived building geometry.
  * Details are omitted at overview zoom for mobile GPU budgets.
  */
-function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,detail:StructureDetail){
-  const design=getBuildingStyle(b,seed),h=design.height;
+function drawCityBuilding(g:Graphics,x:number,y:number,b:Building,seed:number,detail:StructureDetail,progress=1){
+  const design=getBuildingStyle(b,seed),h=Math.max(6,Math.round(design.height*progress));
   const roofline=y-h+5;
   const isHome=b.kind===1;
   const fittedVariant=isHome&&(design.silhouette==='pitched'||design.name==='townhouse')?1:b.kind===3?3:2;
-  buildingBox(g,x,y,h,design.roof,design.left,design.right,fittedVariant,detail);
+  buildingBox(g,x,y,h,design.roof,design.left,design.right,fittedVariant,progress<.9?'overview':detail);
+  // During construction only the block silhouette rises. Details and rooftop
+  // equipment arrive in the finishing stage, so the change is visible.
+  if(progress<.9)return;
   if(design.silhouette==='pitched'){
     // Raised ridge, chimney and porch visually distinguish small homes.
     g.moveTo(x-18,y+HH-h+6).lineTo(x,y-h+3).lineTo(x+18,y+HH-h+6)
@@ -142,7 +145,8 @@ function renderTerrain(g:Graphics,city:City){
   }
 }
 function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:StructureDetail,
-  viewport:{width:number;height:number;panX:number;panY:number;zoom:number}):number{
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number},
+  constructionTiles:ReadonlySet<number>=new Set()):number{
   g.clear();
   if(!window)return 0;
   let renderedTiles=0;
@@ -183,7 +187,7 @@ function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:Str
       }
     }
     if(b){
-      drawCityBuilding(g,p.x,p.y,b,city.seed,detail);
+      if(!constructionTiles.has(i))drawCityBuilding(g,p.x,p.y,b,city.seed,detail);
     } else if(s){
       if(s.kind==='park'){
         diamond(g,p.x,p.y,0x5e9c69);
@@ -298,31 +302,63 @@ function renderCityEffects(g:Graphics,city:City,mood:CityMood,pulses:readonly Gr
   if(!motion)return;
   for(const pulse of pulses){
     const age=time-pulse.createdAt;
-    if(age<0||age>=3)continue;
+    if(age<0||age>=CONSTRUCTION_SECONDS)continue;
+    const t=age/CONSTRUCTION_SECONDS;
+    const phase=constructionStage(age);
     const pt=tilePosition(pulse.x,pulse.y);
-    const t=age/3,alpha=.8*(1-t);
-    const gold=pulse.kind==='upgrade'?0xffdb73:pulse.kind==='service'?0x77dbec:0x9ce4a1;
-    const radius=6+19*t;
-    g.circle(pt.x,pt.y-12,radius).stroke({width:2.8-1.4*t,color:gold,alpha});
-    // Construction site: scaffolding rises, dust puffs and a crane hook
-    // descends. The event plays once, then vanishes; it is never persisted.
-    if(pulse.kind!=='service'){
-      const rise=Math.sin(Math.min(1,t*2)*Math.PI/2);
-      const top=pt.y+8-28*rise;
-      g.moveTo(pt.x-13,pt.y+11).lineTo(pt.x-13,top)
-        .lineTo(pt.x+12,top).lineTo(pt.x+12,pt.y+11)
-        .stroke({color:0xe9bb74,width:1.6,alpha:alpha*.85});
-      g.moveTo(pt.x-15,top-6).lineTo(pt.x+18,top-6)
-        .stroke({color:0xffd48c,width:1.8,alpha:alpha*.9});
-      g.moveTo(pt.x+9,top-6).lineTo(pt.x+9,top+10*t)
-        .stroke({color:0xd7b892,width:1,alpha});
-      for(let i=0;i<3;i++){
-        const wave=(t+i/3)%1;
-        g.circle(pt.x+(i-1)*12+wave*4,pt.y+HH-wave*13,2+wave*3)
-          .fill({color:0xded9c4,alpha:(1-wave)*alpha*.55});
+    const color=pulse.kind==='upgrade'?0xffdf81:pulse.kind==='service'?0x83e4ee:0xa3e9ba;
+    if(pulse.kind==='service'){
+      const radius=5+22*t;
+      g.circle(pt.x,pt.y-10,radius).stroke({width:2.5,color,alpha:.7*(1-t)});
+      continue;
+    }
+    const building=city.buildings.find(b=>b.x===pulse.x&&b.y===pulse.y);
+    if(!building)continue;
+    // Stage 1 — groundwork: a visible excavation, stakes and site dust.
+    if(phase==='foundation'){
+      const reveal=Math.min(1,t/.22);
+      diamond(g,pt.x,pt.y,0xb28f64,.75);
+      g.poly([pt.x-15,pt.y+HH,pt.x,pt.y+HH-8,pt.x+15,pt.y+HH,pt.x,pt.y+HH+8])
+        .stroke({width:2.3,color:0xffd58c,alpha:.9});
+      for(const d of [-1,1]){
+        g.circle(pt.x+d*13,pt.y+HH+3-reveal*4,3+reveal*3)
+          .fill({color:0xded3b5,alpha:.36*(1-reveal*.5)});
+      }
+      continue;
+    }
+    // Stage 2 — the masonry rises from the foundation while a temporary
+    // scaffold and crane mark the building as under construction.
+    const rise=phase==='frame'?Math.max(.12,(t-.22)/.55):1;
+    drawCityBuilding(g,pt.x,pt.y,building,city.seed,'overview',rise);
+    if(phase==='frame'){
+      const h=getBuildingStyle(building,city.seed).height*rise;
+      const top=pt.y+7-h;
+      g.moveTo(pt.x-17,pt.y+HH+10).lineTo(pt.x-17,top)
+        .lineTo(pt.x+17,top).lineTo(pt.x+17,pt.y+HH+10)
+        .stroke({width:1.7,color:0xedbb67,alpha:.83});
+      for(let i=0;i<4;i++){
+        const yy=pt.y+HH+9-i*h/4;
+        g.moveTo(pt.x-17,yy).lineTo(pt.x+17,yy)
+          .stroke({width:1.1,color:0xffdea0,alpha:.72});
+      }
+      const sway=Math.sin(age*2)*4;
+      g.moveTo(pt.x+17,top-8).lineTo(pt.x-6,top-8)
+        .stroke({width:2,color:0xf8d183});
+      g.moveTo(pt.x-5,top-8).lineTo(pt.x-5+sway,top+7)
+        .stroke({width:1,color:0xb8a78d});
+      g.circle(pt.x+12,pt.y+HH+5,4).fill({color:0xe7d1a3,alpha:.33});
+    } else {
+      // Stage 3 — finish details and a short one-off completion sparkle.
+      drawCityBuilding(g,pt.x,pt.y,building,city.seed,'detail',1);
+      const fade=Math.max(0,(CONSTRUCTION_SECONDS-age)/(.23*CONSTRUCTION_SECONDS));
+      const sparkleY=pt.y-getBuildingStyle(building,city.seed).height-6;
+      for(let i=0;i<4;i++){
+        const angle=i*Math.PI/2+t*2;
+        const x=pt.x+Math.cos(angle)*(10+(1-fade)*12);
+        const y=sparkleY+Math.sin(angle)*(7+(1-fade)*8);
+        g.circle(x,y,2.4).fill({color,alpha:fade*.95});
       }
     }
-    g.circle(pt.x,pt.y-12,3+4*t).fill({color:gold,alpha:alpha*.42});
   }
 }
 function renderTrafficHeatmap(g:Graphics, city:City){
@@ -395,7 +431,12 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     if(frameBudget<33)return;
     animationTime+=Math.min(0.075,frameBudget/1000);frameBudget=0;
     renderAmbient(ambient,scene,animationTime);
-    if(pulses.length){pulses=pulses.filter(p=>animationTime-p.createdAt<3);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);}
+    if(pulses.length){
+      const before=pulses.length;
+      pulses=pulses.filter(p=>animationTime-p.createdAt<CONSTRUCTION_SECONDS);
+      if(pulses.length!==before)refreshVisibleStructures(true);
+      renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);
+    }
   };
   app.ticker.add(onAnimationFrame);
   let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
@@ -409,8 +450,9 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     renderedWindow=paddedTileWindow(visible,8);
     renderedDetail=detail;
     renderedZoom=zoom;
+    const hidden=new Set(pulses.filter(p=>p.kind!=='service').map(p=>tileIndex(p.x,p.y)));
     const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
-      {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
+      {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom},hidden);
     structureBuilds++;
     app.canvas.dataset.structureTiles=String(renderedTiles);
     app.canvas.dataset.structureDetail=detail;
@@ -539,7 +581,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     setMode(next){mode=next;hover=null;updateOverlay();},
     setTrafficView(enabled){if(trafficVisible===enabled)return;trafficVisible=enabled;if(enabled)renderTrafficHeatmap(trafficHeatmap,city);else trafficHeatmap.clear();},
     setLandView(enabled){if(landVisible===enabled)return;landVisible=enabled;if(enabled)renderLandHeatmap(landHeatmap,city);else landHeatmap.clear();},
-    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();pulses=[];}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
+    setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();if(pulses.length){pulses=[];refreshVisibleStructures(true);}}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
       resizeObserver.disconnect();
