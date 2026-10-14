@@ -31,7 +31,12 @@ test('records first-map visibility and animated frame pacing without a regressio
     };
     requestAnimationFrame(tick);
   }));
-  const data={project:testInfo.project.name,readyMs,...stats};
+  const structure=await page.locator('.map-host canvas').evaluate(el=>({
+    renderedTiles:Number((el as HTMLCanvasElement).dataset.structureTiles),
+    detail:(el as HTMLCanvasElement).dataset.structureDetail??'unknown',
+    rebuilds:Number((el as HTMLCanvasElement).dataset.structureBuilds),
+  }));
+  const data={project:testInfo.project.name,readyMs,...stats,...structure};
   console.log('[MAP-PERF] '+JSON.stringify(data));
   await testInfo.attach('map-performance.json',{body:JSON.stringify(data,null,2),contentType:'application/json'});
   expect(stats.samples).toBe(90);

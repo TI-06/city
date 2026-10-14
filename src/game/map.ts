@@ -1,5 +1,6 @@
 import { Application, Container, Graphics, type Ticker } from 'pixi.js';
 import { buildAmbientScene, type AmbientScene } from './ambient';
+import {visibleTileWindow,paddedTileWindow,needsTileWindowRefresh,structureDetailAtZoom,tileNearViewport,type TileWindow,type StructureDetail} from './viewport';
 import {appendGrowthPulses,detectGrowthEvents,visualMood,type CityMood,type GrowthPulse} from './visual-state';
 import { canPlaceAt, type City, type Tool, SIZE, tileIndex } from '../core/city';
 import { analyzeTraffic, getRoadCapacity } from '../core/traffic';
@@ -26,7 +27,7 @@ function drawTree(g:Graphics,x:number,y:number,v:number){
   g.circle(x+5,y-3,7).fill(0x5eaa70);
   g.circle(x-4,y-7,6).fill(0x78b579);
 }
-function buildingBox(g:Graphics,x:number,y:number,h:number,top:number,left:number,right:number,variant:number){
+function buildingBox(g:Graphics,x:number,y:number,h:number,top:number,left:number,right:number,variant:number,detail:StructureDetail='detail'){
   // Drop shadow first to ground the house in the tile.
   g.ellipse(x+5,y+HH+9,HW*.8,HH*.55).fill({color:0x244c38,alpha:.15});
   g.poly([x-HW+4,y+HH+2,x,y+HH*2-1,x,y+HH*2-h,x-HW+4,y+HH-h+3]).fill(left);
@@ -43,6 +44,8 @@ function buildingBox(g:Graphics,x:number,y:number,h:number,top:number,left:numbe
     g.rect(x-4,y-h+6,8,5).fill(0x687780);
     g.rect(x+1,y-h+3,5,3).fill(0xa28c77);
   }
+  // At overview zoom the dozens of tiny window quads are sub-pixel noise.
+  if(detail==='overview')return;
   const floors=Math.min(4,Math.max(1,Math.floor(h/12)));
   for(let floor=0;floor<floors;floor++){
     const yy=y+HH+5-floor*10;
@@ -66,21 +69,28 @@ function renderTerrain(g:Graphics,city:City){
     if(v%12===0){g.circle(p.x-10,p.y+HH-2,1.5).fill({color:0xcad5a1,alpha:.6});}
   }
 }
-function renderStructures(g:Graphics,city:City){
+function renderStructures(g:Graphics,city:City,window:TileWindow|null,detail:StructureDetail,
+  viewport:{width:number;height:number;panX:number;panY:number;zoom:number}):number{
   g.clear();
+  if(!window)return 0;
+  let renderedTiles=0;
   const buildings=new Map(city.buildings.map(b=>[tileIndex(b.x,b.y),b]));
   const services=new Map(city.services.map(s=>[tileIndex(s.x,s.y),s]));
-  for(let sum=0;sum<2*SIZE-1;sum++)for(let y=Math.max(0,sum-SIZE+1);y<=Math.min(SIZE-1,sum);y++){
+  for(let sum=window.minX+window.minY;sum<=window.maxX+window.maxY;sum++)
+    for(let y=Math.max(window.minY,sum-window.maxX);y<=Math.min(window.maxY,sum-window.minX);y++){
     const x=sum-y,i=tileIndex(x,y);
+    if(!tileNearViewport(x,y,viewport.width,viewport.height,viewport.panX,viewport.panY,viewport.zoom))continue;
+    renderedTiles++;
     if(city.land[i]===0)continue;
     const p=tilePosition(x,y),v=hash(x,y,city.seed),b=buildings.get(i),s=services.get(i);
     if(city.zones[i]){
       diamond(g,p.x,p.y,COVERAGE[city.zones[i]!]!,0.42);
-      if(!b){g.circle(p.x,p.y+HH,2.5).fill({color:COVERAGE[city.zones[i]!]!,alpha:.9});}
+      if(!b&&detail==='detail'){g.circle(p.x,p.y+HH,2.5).fill({color:COVERAGE[city.zones[i]!]!,alpha:.9});}
     }
     if(city.roads[i]){
       diamond(g,p.x,p.y,city.roads[i]===2?0x485b6f:0x647879);
       if(city.roads[i]===2)diamond(g,p.x,p.y,0x8bacc1,0.13);
+      if(detail==='detail'){
       const dirs=[[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy])=>{
         const xx=x+dx!, yy=y+dy!;return xx>=0&&yy>=0&&xx<SIZE&&yy<SIZE&&(city.roads[tileIndex(xx,yy)]??0)>0;
       });
@@ -89,28 +99,30 @@ function renderStructures(g:Graphics,city:City){
       if(north||south)g.moveTo(p.x+15,p.y+6).lineTo(p.x-15,p.y+20).stroke({width:1.4,color:0xf5d5a0,alpha:.76});
       if((west||east)&&(north||south))g.circle(p.x,p.y+HH,2).fill(0xf4d4a6);
       if(city.roads[i]===2){g.circle(p.x-9,p.y+HH-4,2).fill(0xffe8a8);g.circle(p.x+9,p.y+HH+4,2).fill(0xffe8a8);}
+      }
     }
     if(b){
       const h=b.kind===1?13+b.level*7:b.kind===2?24+b.level*9:19+b.level*9;
       const roof=ROOFS[b.kind]!+(v%3)*0x010101;
-      buildingBox(g,p.x,p.y,h,roof,WALLS[b.kind]!,b.kind===1?0xcba98c:b.kind===2?0x7ea5a5:0x9a8781,b.kind);
-      if(b.kind===3){g.rect(p.x+14,p.y-h-12,5,15).fill(0x889190);g.ellipse(p.x+16,p.y-h-16,6,3).fill({color:0xe2e6e0,alpha:.45});}
+      buildingBox(g,p.x,p.y,h,roof,WALLS[b.kind]!,b.kind===1?0xcba98c:b.kind===2?0x7ea5a5:0x9a8781,b.kind,detail);
+      if(b.kind===3&&detail==='detail'){g.rect(p.x+14,p.y-h-12,5,15).fill(0x889190);g.ellipse(p.x+16,p.y-h-16,6,3).fill({color:0xe2e6e0,alpha:.45});}
     } else if(s){
       if(s.kind==='park'){
         diamond(g,p.x,p.y,0x5e9c69);
-        drawTree(g,p.x-9,p.y+7,v);drawTree(g,p.x+9,p.y+16,v+1);
+        drawTree(g,p.x-9,p.y+7,v);if(detail==='detail')drawTree(g,p.x+9,p.y+16,v+1);
         g.circle(p.x+1,p.y+14,3).fill(0xe6d6a9);
       } else {
-        buildingBox(g,p.x,p.y,s.kind==='school'?22:29,SERVICE_COLORS[s.kind],0xc6c8b2,0xe2e8db,2);
+        buildingBox(g,p.x,p.y,s.kind==='school'?22:29,SERVICE_COLORS[s.kind],0xc6c8b2,0xe2e8db,2,detail);
         if(s.kind==='clinic'){
           g.rect(p.x-2,p.y-24,4,12).fill(0xb9585e);
           g.rect(p.x-6,p.y-20,12,4).fill(0xb9585e);
         }
       }
-    } else if(!city.roads[i]&&!city.zones[i]&&v%29===0){
+    } else if(detail==='detail'&&!city.roads[i]&&!city.zones[i]&&v%29===0){
       drawTree(g,p.x-2,p.y+9,v);
     }
   }
+  return renderedTiles;
 }
 /**
  * Draw only ~60 ephemeral objects per 30fps step; the 4,096 world tiles
@@ -249,9 +261,26 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     if(pulses.length){pulses=pulses.filter(p=>animationTime-p.createdAt<3);renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);}
   };
   app.ticker.add(onAnimationFrame);
-  let zoom=.85,panX=0,panY=0;
+  let zoom=.85,panX=0,panY=0,renderedWindow:TileWindow|null=null;
+  let renderedDetail:StructureDetail|null=null,structureBuilds=0,renderedZoom=0;
+  const refreshVisibleStructures=(force=false)=>{
+    const visible=visibleTileWindow(host.clientWidth,host.clientHeight,panX,panY,zoom);
+    const detail=structureDetailAtZoom(zoom);
+    const zoomChangedEnough=renderedZoom===0||zoom>renderedZoom*1.35||zoom<renderedZoom*.72;
+    if(!force&&detail===renderedDetail&&!zoomChangedEnough
+      &&!needsTileWindowRefresh(renderedWindow,visible))return;
+    renderedWindow=paddedTileWindow(visible,8);
+    renderedDetail=detail;
+    renderedZoom=zoom;
+    const renderedTiles=renderStructures(structures,city,renderedWindow,detail,
+      {width:host.clientWidth,height:host.clientHeight,panX,panY,zoom});
+    structureBuilds++;
+    app.canvas.dataset.structureTiles=String(renderedTiles);
+    app.canvas.dataset.structureDetail=detail;
+    app.canvas.dataset.structureBuilds=String(structureBuilds);
+  };
   const resetView=()=>{zoom=Math.max(.35,Math.min(1.05,host.clientWidth/1000));panX=host.clientWidth/2;panY=host.clientHeight/2-((SIZE-1)*HH)*zoom;updateCamera();};
-  const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);};
+  const updateCamera=()=>{stage.scale.set(zoom);stage.position.set(panX,panY);refreshVisibleStructures();};
   const updateOverlay=()=>renderOverlay(overlay,city,selection,hover,down?.path??[],tool);
   const zoomBy=(factor:number,cx=host.clientWidth/2,cy=host.clientHeight/2)=>{
     const next=Math.max(.3,Math.min(2.4,zoom*factor));
@@ -263,7 +292,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   // at bounded scale to avoid tessellating thousands of diamonds each frame.
   // Mobile retains a lower-resolution terrain cache for texture-memory safety.
   terrain.cacheAsTexture({resolution:mobileCanvas?0.65:0.9,antialias:false});
-  renderStructures(structures,city);
+  // resetView() below builds only the visible structures and keeps an 8-tile guard.
   if(motionEnabled)renderAmbient(ambient,scene,animationTime);
   renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);
   resetView();
@@ -312,13 +341,16 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
   app.canvas.addEventListener('pointerup',pointerUp);app.canvas.addEventListener('pointercancel',pointerCancel);
   app.canvas.addEventListener('lostpointercapture',lostCapture);app.canvas.addEventListener('pointerleave',leave);
   app.canvas.addEventListener('wheel',wheel,{passive:false});app.canvas.addEventListener('contextmenu',contextMenu);
+  // Re-evaluate visible structures after container/layout/rotation changes.
+  const resizeObserver=new ResizeObserver(()=>refreshVisibleStructures(true));
+  resizeObserver.observe(host);
   return {
     setCity(next){const mapChanged=next.seed!==city.seed||(next.land!==city.land&&next.land.some((value,index)=>value!==city.land[index]));
       const visualChanged=mapChanged||next.roads!==city.roads||next.zones!==city.zones||next.buildings!==city.buildings||next.services!==city.services;
       const ambientChanged=visualChanged||next.capitalProjects!==city.capitalProjects;
       if(visualChanged&&motionEnabled){pulses=appendGrowthPulses(pulses,detectGrowthEvents(city,next),animationTime);}
       mood=visualMood(next);
-      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){renderStructures(structures,city);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
+      city=next;if(mapChanged){renderTerrain(terrain,city);terrain.updateCacheTexture();}if(visualChanged){refreshVisibleStructures(true);if(trafficVisible)renderTrafficHeatmap(trafficHeatmap,city);if(landVisible)renderLandHeatmap(landHeatmap,city);}
       if(ambientChanged){scene=buildAmbientScene(city);if(motionEnabled)renderAmbient(ambient,scene,animationTime);}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);updateOverlay();},
     setSelected(next,nextTool){selection=next;tool=nextTool;updateOverlay();},
     setMode(next){mode=next;hover=null;updateOverlay();},
@@ -327,6 +359,7 @@ export async function mountMap(host:HTMLElement,initial:City,onTiles:(path:reado
     setMotion(enabled){motionEnabled=enabled;if(enabled)renderAmbient(ambient,scene,animationTime);else {ambient.clear();pulses=[];}renderCityEffects(cityEffects,city,mood,pulses,animationTime,motionEnabled);},
     resetView,zoomBy:factor=>zoomBy(factor),
     destroy(){
+      resizeObserver.disconnect();
       app.ticker.remove(onAnimationFrame);
       app.canvas.removeEventListener('pointerdown',pointerDown);app.canvas.removeEventListener('pointermove',pointerMove);
       app.canvas.removeEventListener('pointerup',pointerUp);app.canvas.removeEventListener('pointercancel',pointerCancel);
