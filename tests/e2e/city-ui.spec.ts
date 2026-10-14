@@ -8,7 +8,7 @@ test('map renders and editor controls work without runtime exceptions', async ({
   const canvas=page.locator('.map-host canvas');
   await expect(canvas).toBeVisible({timeout:30_000});
   await expect(page.locator('.map-status')).toContainText('マップ稼働中');
-  await page.locator('.tool-tile').filter({hasText:'道路'}).click();
+  await page.locator('.tool-tile[title="道路を建設"]').click();
   await expect(page.locator('.view-modes button').nth(1)).toHaveAttribute('aria-pressed','true');
   await page.getByRole('button',{name:'縮小'}).click();
   await page.getByRole('button',{name:'拡大'}).click();
