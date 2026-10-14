@@ -38,3 +38,16 @@ test('no horizontal page overflow at configured viewport', async ({page}) => {
   await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
 });
+test('traffic dashboard and congestion heatmap are reachable on desktop and mobile', async ({page}) => {
+  const errors:string[]=[];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await expect(page.locator('.map-host canvas')).toBeVisible({timeout:30_000});
+  await page.getByRole('button',{name:/交通・物流/}).click();
+  await expect(page.getByText('交通分析')).toBeVisible();
+  await expect(page.getByRole('meter',{name:'推定混雑度'})).toBeVisible();
+  await expect(page.locator('.traffic-legend')).toBeVisible();
+  await expect(page.getByText('交通による企業生産効率')).toBeVisible();
+  await expect(page.getByText('平均通勤距離')).toBeVisible();
+  expect(errors).toEqual([]);
+});
