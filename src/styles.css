@@ -421,3 +421,15 @@
 .map-budget-borrow{padding:10px;background:#315f76;color:white;font-weight:800;font-size:11px;border-radius:8px}
 .map-budget-borrow:disabled{opacity:.48}
 @media(max-width:700px){.map-budget-options button{min-width:64px}.map-operations-tabs button{font-size:10px}}
+
+/* Map toolbar must always be reachable. Place governance beneath the camera
+ * controls on desktop, and keep active construction notices away from the
+ * vertical controls on narrow phones. */
+@media(min-width:701px){
+ .map-operations{top:78px}
+ .map-construction-focus{top:136px}
+ .map-operations.is-open ~ .map-construction-focus{opacity:0;pointer-events:none}
+}
+@media(max-width:700px){
+ .map-construction-focus{left:8px;right:auto;top:74px;max-width:calc(100% - 88px)}
+}
