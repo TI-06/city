@@ -433,3 +433,141 @@
 @media(max-width:700px){
  .map-construction-focus{left:8px;right:auto;top:74px;max-width:calc(100% - 88px)}
 }
+
+/* Phase 5-6: compact, reliable thumb-control rail on the phone map.
+ * Open menus rise above the action rail instead of covering adjacent buttons.
+ * The original desktop layout and optional legacy phone dock remain intact.
+ */
+.map-time-rail{display:none}
+.operations-short-label{display:none}
+.map-operations-launcher{display:flex;align-items:center;justify-content:center;gap:5px}
+@media(max-width:700px){
+  .map-floating-toolbar{
+    top:9px;right:8px;gap:5px;align-items:flex-end;max-width:130px
+  }
+  .map-floating-toolbar .view-modes{
+    flex-direction:row;gap:2px;width:auto;padding:3px
+  }
+  .map-floating-toolbar .view-modes button{
+    min-width:51px;width:51px;min-height:40px;height:40px;padding:0 2px;font-size:10px
+  }
+  .map-floating-toolbar .zoom-controls{
+    display:grid;grid-template-columns:repeat(2,43px);gap:3px;
+    width:auto;padding:4px
+  }
+  .map-floating-toolbar .zoom-controls button{
+    width:43px;min-height:43px;height:43px;padding:0
+  }
+  .mobile-progress-chip{
+    top:11px;left:8px;max-width:calc(100% - 137px);font-size:10px;
+    padding:8px 9px;gap:3px
+  }
+  .mobile-progress-chip span:last-child{font-size:9px}
+  .map-construction-focus{
+    top:78px;left:8px;right:auto;max-width:calc(100% - 135px);
+    font-size:9px;padding:7px 8px
+  }
+  .map-construction-focus strong{font-size:9px}
+  .map-quick-menu,.map-operations,.map-time-rail{
+    bottom:calc(116px + env(safe-area-inset-bottom))
+  }
+  .map-quick-menu{
+    display:flex;flex-direction:column-reverse;align-items:flex-start;
+    left:8px;top:auto;width:max-content;max-width:calc(100% - 16px);z-index:13
+  }
+  .map-quick-menu:not(.is-open){max-width:calc(100% - 240px)}
+  .map-quick-trigger,.map-operations-launcher{
+    min-height:44px;height:44px;border-radius:11px;padding:7px 9px;
+    font-size:11px;white-space:nowrap;touch-action:manipulation
+  }
+  .map-quick-trigger{gap:5px;max-width:102px}
+  .map-quick-trigger>span{font-size:18px}
+  .map-quick-trigger strong{max-width:57px;font-size:10px}
+  .map-quick-menu.is-open{
+    width:min(312px,calc(100% - 16px));max-width:calc(100% - 16px);z-index:19
+  }
+  .map-quick-menu.is-open .map-quick-trigger{
+    max-width:100%;border-radius:0 0 11px 11px
+  }
+  .map-quick-menu.is-open .map-quick-trigger strong{max-width:190px}
+  .map-quick-body{
+    width:100%;max-height:min(290px,38dvh);overflow-y:auto;
+    border:1px solid #a8cab1;border-bottom:0;border-radius:12px 12px 0 0;
+    overscroll-behavior:contain
+  }
+  .map-quick-footer{flex-wrap:wrap}
+  .map-quick-footer>span{flex-basis:100%;font-size:11px}
+  .map-quick-footer button{min-height:38px}
+  .map-operations{
+    top:auto;right:calc(8px + 130px + 8px);
+    width:79px;max-width:79px;z-index:13;
+    flex-direction:column-reverse;align-items:stretch
+  }
+  .map-operations-launcher{
+    width:79px;padding:7px 5px;gap:4px
+  }
+  .operations-full-label{display:none}
+  .operations-short-label{display:inline;font-weight:800}
+  .map-operations.is-open{
+    width:min(310px,calc(100% - 16px));max-width:calc(100% - 16px);
+    right:8px;z-index:19
+  }
+  .map-operations.is-open .map-operations-launcher{
+    width:100%;border-radius:0 0 11px 11px
+  }
+  .map-operations-body{
+    max-height:min(360px,42dvh);overflow-y:auto;
+    border-radius:12px 12px 0 0;
+    border-bottom:0;overscroll-behavior:contain
+  }
+  .map-time-rail{
+    position:absolute;right:8px;display:flex;gap:4px;z-index:14;
+    align-items:center;pointer-events:none
+  }
+  .map-time-rail button{
+    pointer-events:auto;min-height:44px;height:44px;border-radius:11px;
+    box-shadow:0 6px 20px #16372c55;touch-action:manipulation;
+    color:white;font-size:12px;font-weight:850
+  }
+  .map-time-toggle{width:42px;background:#286750}
+  .map-time-next{
+    width:82px;padding:0 7px;background:#cf9c3f;color:#1c3b2c!important;
+    display:flex;align-items:center;justify-content:center;gap:5px
+  }
+  .map-time-next span{font-size:19px}
+  .app-shell[data-tools-open="yes"] .map-quick-menu,
+  .app-shell[data-tools-open="yes"] .map-operations,
+  .app-shell[data-tools-open="yes"] .map-time-rail{
+    bottom:calc(258px + env(safe-area-inset-bottom))
+  }
+  .app-shell[data-map-quick-open="yes"] .map-operations,
+  .app-shell[data-operations-open="yes"] .map-quick-menu,
+  .app-shell[data-map-quick-open="yes"] .map-time-rail,
+  .app-shell[data-operations-open="yes"] .map-time-rail{
+    display:none
+  }
+  .app-shell[data-map-quick-open="yes"] .map-quick-menu,
+  .app-shell[data-operations-open="yes"] .map-operations{
+    bottom:calc(116px + env(safe-area-inset-bottom))
+  }
+  .app-shell[data-map-quick-open="yes"] .mobile-progress-chip,
+  .app-shell[data-operations-open="yes"] .mobile-progress-chip{
+    display:none
+  }
+}
+@media(max-width:370px){
+  .map-quick-menu:not(.is-open){max-width:86px}
+  .map-quick-trigger{max-width:86px;padding-left:6px;padding-right:6px;gap:3px}
+  .map-quick-trigger strong{max-width:45px;font-size:9px}
+  .map-operations{right:139px;width:72px;max-width:72px}
+  .map-operations-launcher{width:72px;gap:2px;font-size:10px}
+  .map-time-rail .map-time-next{width:76px}
+  .map-time-rail .map-time-toggle{width:40px}
+  .map-construction-focus{max-width:calc(100% - 125px)}
+}
+@media(min-width:701px){
+  .map-time-rail{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .map-quick-body,.map-operations-body{animation:none;transition:none}
+}
