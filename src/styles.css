@@ -571,3 +571,9 @@
 @media(prefers-reduced-motion:reduce){
   .map-quick-body,.map-operations-body{animation:none;transition:none}
 }
+
+/* Fit every open overlay inside the actually measured map viewport. */
+@media(max-width:700px){
+ .map-quick-body{max-height:min(290px,38dvh,var(--map-menu-max-height,180px))}
+ .map-operations-body{max-height:min(360px,42dvh,var(--map-menu-max-height,180px))}
+}
