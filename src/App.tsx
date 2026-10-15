@@ -125,6 +125,18 @@ export function App(){
     }).catch(e=>{if(!disposed)setMessage(`描画を開始できませんでした：${String(e)}`);});
     return()=>{disposed=true;mapRef.current?.destroy();mapRef.current=null;};
   },[onTiles]);
+  // A phone's usable map height changes with browser chrome and orientation.
+  // Limit popovers by the actual canvas host, so their tops never disappear
+  // behind the city HUD on short devices.
+  useEffect(()=>{
+    const host=mapHost.current;
+    if(!host)return;
+    const update=()=>host.style.setProperty('--map-menu-max-height',
+      `${Math.max(70,Math.floor(host.clientHeight-172))}px`);
+    const observer=new ResizeObserver(update);
+    observer.observe(host);update();
+    return()=>{observer.disconnect();host.style.removeProperty('--map-menu-max-height');};
+  },[]);
   useEffect(()=>{mapRef.current?.setCity(city);},[city]);
   useEffect(()=>{mapRef.current?.setSelected(selected,tool);},[selected,tool]);
   useEffect(()=>{mapRef.current?.setMode(mode);},[mode]);
