@@ -129,6 +129,9 @@ test('narrow phone retains reachable map controls at 320 pixels',async ({page},t
   expect(r).not.toBeNull();
   expect(r!.x).toBeGreaterThanOrEqual(0);
   expect(r!.x+r!.width).toBeLessThanOrEqual(321);
+  const mapBounds=await page.locator('.map-host').boundingBox();
+  expect(mapBounds).not.toBeNull();
+  expect(r!.y).toBeGreaterThanOrEqual(mapBounds!.y-3);
   await page.getByRole('button',{name:'地図の建設メニューを閉じる'}).click();
   await government.click();
   const governance=page.locator('.map-operations-body');
@@ -136,6 +139,7 @@ test('narrow phone retains reachable map controls at 320 pixels',async ({page},t
   const g=await governance.boundingBox();
   expect(g!.x).toBeGreaterThanOrEqual(0);
   expect(g!.x+g!.width).toBeLessThanOrEqual(321);
+  expect(g!.y).toBeGreaterThanOrEqual(mapBounds!.y-3);
   await page.getByRole('button',{name:'都市運営メニューを閉じる'}).click();
   await next.click();
   await expect(page.locator('.map-host canvas')).toBeVisible();
