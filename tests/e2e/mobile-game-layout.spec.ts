@@ -90,6 +90,8 @@ test('phone city controls are thumb reachable without blocking each other',async
   await expect(page.locator('.date-label')).not.toHaveText(before);
   await play.click();
   await expect(page.getByRole('button',{name:'地図で一時停止'})).toBeVisible();
+  await next.click();
+  await expect(page.getByRole('button',{name:'地図で一時停止'})).toBeVisible();
   await page.getByRole('button',{name:'地図で一時停止'}).click();
   await build.click();
   await expect(page.getByRole('group',{name:'地図建設コマンド'})).toBeVisible();
