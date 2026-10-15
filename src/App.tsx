@@ -158,9 +158,15 @@ export function App(){
     const timer=window.setInterval(()=>progressMonth(),20000/city.speed);
     return()=>window.clearInterval(timer);
   },[city.paused,city.speed,progressMonth]);
-  useEffect(()=>{const handler=(e:KeyboardEvent)=>{if(e.code==='Space'&&!['INPUT','TEXTAREA','BUTTON'].includes((e.target as HTMLElement).tagName)){e.preventDefault();setCity(c=>({...c,paused:!c.paused}));}if(e.code==='Escape'){setTool('inspect');setMode('pan');}if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'&&!['INPUT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();undo();}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[undo]);
-  const toggle=()=>setCity(c=>({...c,paused:!c.paused}));
-  const setSpeed=(speed:1|2|4)=>setCity(c=>({...c,speed,paused:false}));
+  useEffect(()=>{const handler=(e:KeyboardEvent)=>{if(e.code==='Space'&&!['INPUT','TEXTAREA','BUTTON'].includes((e.target as HTMLElement).tagName)){e.preventDefault();const current=cityRef.current,next={...current,paused:!current.paused};cityRef.current=next;setCity(next);}if(e.code==='Escape'){setTool('inspect');setMode('pan');}if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'&&!['INPUT','TEXTAREA'].includes((e.target as HTMLElement).tagName)){e.preventDefault();undo();}};window.addEventListener('keydown',handler);return()=>window.removeEventListener('keydown',handler);},[undo]);
+  const toggle=()=>{
+    const current=cityRef.current,next={...current,paused:!current.paused};
+    cityRef.current=next;setCity(next);
+  };
+  const setSpeed=(speed:1|2|4)=>{
+    const current=cityRef.current,next={...current,speed,paused:false};
+    cityRef.current=next;setCity(next);
+  };
   const applyPolicy=(p:Policy)=>{editedRef.current=true;const next=changePolicy(city,p);cityRef.current=next;setCity(next);void saveCity(next);setMessage(`${POLICY_LABELS[p]}の方針へ変更しました`);};
   const applyTax=(t:number)=>{editedRef.current=true;const next=changeTax(city,t);cityRef.current=next;setCity(next);void saveCity(next);};
   const applyMaintenance=(plan:MaintenancePlan)=>{editedRef.current=true;const next=changeMaintenancePlan(cityRef.current,plan);cityRef.current=next;setCity(next);void saveCity(next).catch(()=>setSaveLabel('保存エラー'));setMessage(`${MAINTENANCE_LABELS[plan]}に変更しました`);};
