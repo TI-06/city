@@ -58,6 +58,8 @@ export function App(){
   const [mobileToolsOpen,setMobileToolsOpen]=useState(()=>!window.matchMedia('(max-width:700px)').matches);
   const [mobileMenuOpen,setMobileMenuOpen]=useState(false);
   const [mapQuickOpen,setMapQuickOpen]=useState(false);
+  const [operationsOpen,setOperationsOpen]=useState(false);
+  const [operationsTab,setOperationsTab]=useState<'policy'|'tax'|'invest'|'budget'|'roads'>('policy');
   const [mapQuickGroup,setMapQuickGroup]=useState<BuildGroup>('zones');
   const [selected,setSelected]=useState<{x:number;y:number}|null>(null);
   const selectedRef=useRef<{x:number;y:number}|null>(null);selectedRef.current=selected;
@@ -216,12 +218,12 @@ export function App(){
     void saveCity(next);setMessage('新しい都市を作りました');
   };
   const switchMenu=(menu:Menu)=>{
-    setMobileMenuOpen(false);setMapQuickOpen(false);setActive(menu);
+    setMobileMenuOpen(false);setMapQuickOpen(false);setOperationsOpen(false);setActive(menu);
     if(menu==='build'){setMode(canDragPaint(tool)?'paint':'pan');}
     else setMode('pan');
   };
   const openMapQuick=()=>{
-    if(!mapQuickOpen&&window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);
+    if(!mapQuickOpen){setOperationsOpen(false);if(window.matchMedia('(max-width:700px)').matches)setMobileToolsOpen(false);}
     setMapQuickOpen(prev=>!prev);
   };
   const selectedStyle=selected?buildingStyleLabel(city,selected.x,selected.y):null;
@@ -232,7 +234,8 @@ export function App(){
       <div className="brand"><div className="brandmark">C<span>•</span></div><div><strong>CITYSCAPE</strong><small>街づくりと都市経営</small></div></div>
       <div className="sidebar-section-label">CITY MANAGER</div>
       <nav aria-label="メインメニュー" className="menu">
-        {([{id:'build',icon:'▦',name:'都市建設'},{id:'finance',icon:'▥',name:'財政と経済'},{id:'traffic',icon:'⇄',name:'交通・物流'},{id:'residents',icon:'♙',name:'住民と人口'},{id:'policy',icon:'⚑',name:'政策と行政'}] as const).map(item=><button key={item.id} className={`menu-link ${active===item.id?'active':''}`} onClick={()=>switchMenu(item.id)} aria-current={active===item.id?'page':undefined}><span className="menu-icon">{item.icon}</span>{item.name}{active===item.id&&<span className="menu-dot"/>}</button>)}
+        <button className={`menu-link ${active==='build'?'active':''}`} onClick={()=>switchMenu('build')} aria-current={active==='build'?'page':undefined}><span className="menu-icon">▦</span>街を運営</button>
+        <button className={`menu-link ${active!=='build'?'active':''}`} aria-label="都市データ" onClick={()=>switchMenu('finance')} aria-current={active!=='build'?'page':undefined}><span className="menu-icon">▤</span>都市データ</button>
       </nav>
       <div className="sidebar-bottom"><div className="sidebar-label">あなたの都市</div><div className="city-identity"><div className="avatar">緑</div><div><b>{city.name}</b><small>市長として運営中</small></div></div><div className="side-footer">PHASE 4 · CITY GROWTH 0.8</div></div>
     </aside>
@@ -245,6 +248,11 @@ export function App(){
         <button onClick={()=>{void restoreBackup();setMobileMenuOpen(false);}}>バックアップから復元</button>
         <button onClick={startNewCity}>新しい都市を始める</button>
       </div>}
+      {active!=='build'&&<nav className="data-subnav" aria-label="都市データの切替">
+        {([{id:'finance',icon:'▥',name:'財政と経済'},{id:'traffic',icon:'⇄',name:'交通・物流'},{id:'residents',icon:'♙',name:'住民と人口'},{id:'policy',icon:'⚑',name:'政策と行政'}] as const).map(item=>
+          <button key={item.id} className={active===item.id?'selected':''} aria-current={active===item.id?'page':undefined}
+            onClick={()=>switchMenu(item.id)}><span>{item.icon}</span>{item.name}</button>)}
+      </nav>}
       <div className="city-bar"><div><div className="eyebrow">MY CITY · JAPAN</div><div className="city-heading"><h1>{city.name}</h1><span className="level-tag">発展中の街</span></div><p>あなたの選択が、街の未来をつくる。</p></div><div className="time-control"><div className="date-label">▣ {monthText(city.month)}</div><div className="time-buttons"><button aria-label={city.paused?'再生':'一時停止'} onClick={toggle} className="play-button">{city.paused?'▶':'Ⅱ'}</button>{([1,2,4] as const).map(n=><button key={n} className={!city.paused&&city.speed===n?'chosen':''} onClick={()=>setSpeed(n)}>×{n}</button>)}<button type="button" className="next-month-button" aria-label="翌月へ進める" onClick={()=>progressMonth(true)}>翌月へ ▶|</button></div></div></div>
       <div className="stat-strip"><div className="stat"><span>総人口</span><strong>{format(stats.population)} <small>人</small></strong><em>⌁ 街の住民</em></div><div className="stat"><span>市の資金</span><strong>{format(city.funds)} <small>C</small></strong><em>◈ 現在の予算</em></div><div className="stat"><span>月間収支</span><strong className={stats.balance>=0?'positive':'negative'}>{stats.balance>=0?'+':''}{format(stats.balance)} <small>C</small></strong><em>前月規模の見込み</em></div><div className="stat"><span>住民満足度</span><strong>{stats.happiness}<small> / 100</small></strong><div className="mini-progress"><i style={{width:`${stats.happiness}%`}}/></div></div></div>
       <div className="content-area">
@@ -279,6 +287,56 @@ export function App(){
                 <button type="button" onClick={()=>setMode(mode==='paint'?'pan':'paint')} disabled={!canDragPaint(tool)}>{mode==='paint'?'✥ 移動':'✎ 描く'}</button><button type="button" className="map-quick-undo" onClick={undo} disabled={!canUndo} aria-label="直前の建設を元に戻す">↶ 戻す</button>
                 <button type="button" className="map-quick-step" onClick={()=>progressMonth(true)}>翌月へ ›</button>
               </div>
+            </div>}
+          </div>}
+          {active==='build'&&<div className={`map-operations ${operationsOpen?'is-open':''}`}>
+            <button type="button" className="map-operations-launcher" aria-label={operationsOpen?'都市運営メニューを閉じる':'都市運営メニューを開く'}
+              aria-expanded={operationsOpen} onClick={()=>{setMapQuickOpen(false);setOperationsOpen(v=>!v);}}>⚑ 都市運営 {operationsOpen?'⌄':'⌃'}</button>
+            {operationsOpen&&<div className="map-operations-body">
+              <div className="map-operations-summary"><b>市の収支 {shortMoney(stats.balance)}/月</b><span>満足度 {stats.happiness} / 100</span></div>
+              <div className="map-operations-tabs" role="group" aria-label="都市運営コマンド">
+                {([{id:'policy',label:'市政'},{id:'tax',label:'税率'},{id:'invest',label:'投資'},{id:'budget',label:'予算'},{id:'roads',label:'交通'}] as const).map(item=><button key={item.id}
+                  className={operationsTab===item.id?'selected':''} aria-pressed={operationsTab===item.id} onClick={()=>setOperationsTab(item.id)}>{item.label}</button>)}
+              </div>
+              {operationsTab==='policy'&&<div className="map-policy-options" role="group" aria-label="地図上の市政方針">
+                {(['balanced','growth','eco','mobility'] as const).map(p=><button key={p} className={city.policy===p?'selected':''}
+                  aria-pressed={city.policy===p} onClick={()=>applyPolicy(p)}>{POLICY_LABELS[p]}</button>)}
+              </div>}
+              {operationsTab==='tax'&&<div className="map-operations-tax"><label htmlFor="quick-tax">住民税率 <strong>{city.tax}%</strong></label>
+                <input id="quick-tax" type="range" min="3" max="18" value={city.tax} onChange={e=>applyTax(Number(e.target.value))}/>
+                <span>減税は住民満足度を改善しますが、税収も減少します。</span></div>}
+              {operationsTab==='invest'&&<div className="map-invest-options">
+                {(['transit','housing','culture'] as const).map(kind=><button type="button" key={kind}
+                  disabled={capitalNextCost(city,kind)===undefined||city.funds<(capitalNextCost(city,kind)??Infinity)}
+                  onClick={()=>invest(kind)}><b>{CAPITAL_LABELS[kind]} Lv.{capitalLevel(city,kind)}</b>
+                  <span>{capitalNextCost(city,kind)===undefined?'整備完了':`${format(capitalNextCost(city,kind)!)} Cで強化`}</span></button>)}
+              </div>}
+              {operationsTab==='budget'&&<div className="map-budget-controls">
+                <div className="map-budget-condition"><span>施設の健全度 <strong>{stats.infrastructureCondition}/100</strong></span>
+                  <span>修繕積み残し <strong>{format(stats.maintenanceBacklog)} C</strong></span></div>
+                <div role="group" aria-label="地図上の保全計画" className="map-budget-options">
+                  {(['minimum','standard','preventive'] as const).map(plan=>
+                    <button key={plan} aria-pressed={stats.maintenancePlan===plan}
+                      className={stats.maintenancePlan===plan?'selected':''}
+                      onClick={()=>applyMaintenance(plan)}>{MAINTENANCE_LABELS[plan]}</button>)}
+                </div>
+                <div className="map-budget-condition"><span>市債残高 <strong>{format(stats.outstandingDebt)} C</strong></span>
+                  <span>毎月返済 <strong>{format(stats.debtService)} C</strong></span></div>
+                <div role="group" aria-label="地図上の財政運営" className="map-budget-options">
+                  <button aria-pressed={stats.fiscalMode==='normal'} className={stats.fiscalMode==='normal'?'selected':''}
+                    onClick={()=>setFiscalMode('normal')}>通常運営</button>
+                  <button aria-pressed={stats.fiscalMode==='austerity'} className={stats.fiscalMode==='austerity'?'selected':''}
+                    onClick={()=>setFiscalMode('austerity')}>支出抑制</button>
+                </div>
+                <button className="map-budget-borrow" type="button" disabled={stats.debtHeadroom<BOND_AMOUNT}
+                  onClick={borrow}>市債で {format(BOND_AMOUNT)} C を調達</button>
+              </div>}
+              {operationsTab==='roads'&&<div className="map-traffic-quick" role="group" aria-label="簡易交通分析">
+                <span>推定混雑度 <b>{stats.congestion}%</b></span><span>混雑道路 <b>{stats.congestedRoads}区画</b></span>
+                <span>交通生産効率 <b>{Math.round(stats.trafficProductivity*100)}%</b></span>
+                <button type="button" onClick={()=>switchMenu('traffic')}>詳しいデータ ↗</button>
+              </div>}
+              <button type="button" className="map-operations-dismiss" onClick={()=>setOperationsOpen(false)}>地図に戻る ✓</button>
             </div>}
           </div>}
           {active==='build'&&focusSite&&<button type="button" className="map-construction-focus"

@@ -364,3 +364,72 @@
 }
 @media(max-width:390px){.map-construction-focus{top:76px;right:6px;max-width:180px;font-size:9px}}
 @media(prefers-reduced-motion:reduce){.construction-pulse-dot{animation:none}}
+
+/* Unified play: one persistent city map, contextual in-map governance, and
+   detailed analysis grouped into a secondary data navigation. */
+.menu{gap:9px}
+.data-subnav{display:flex;gap:7px;padding:10px 22px;background:#eef4ef;border-bottom:1px solid #d9e6dc;overflow-x:auto;scrollbar-width:thin}
+.data-subnav button{flex:1;min-width:115px;padding:9px 12px;border-radius:10px;background:#fff;color:#47675a;font-size:12px;font-weight:700;white-space:nowrap}
+.data-subnav button.selected{color:#fff;background:#267755}
+.data-subnav button span{margin-right:6px}
+.map-operations{position:absolute;top:12px;right:12px;z-index:11;pointer-events:none;width:min(324px,calc(100% - 25px));display:flex;align-items:flex-end;flex-direction:column}
+.map-operations>*{pointer-events:auto}
+.map-operations-launcher{min-height:43px;border-radius:12px;padding:9px 13px;background:#225c71;color:white;border:1px solid #97c6d7;box-shadow:0 7px 22px #173e4c66;font-size:12px;font-weight:800}
+.map-operations.is-open .map-operations-launcher{border-radius:12px 12px 0 0}
+.map-operations-body{width:100%;padding:12px;background:#f7fff6f5;border:1px solid #a6d0c7;border-radius:12px 0 12px 12px;box-shadow:0 14px 26px #152e3466;color:#31584b}
+.map-operations-summary{display:flex;align-items:center;justify-content:space-between;font-size:11px;gap:8px;margin-bottom:9px}
+.map-operations-summary span{font-size:10px}
+.map-operations-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.map-operations-tabs button{background:#e9f0ed;color:#426c5e;border-radius:7px;min-height:35px;font-size:11px;font-weight:800}
+.map-operations-tabs button.selected{background:#257b59;color:white}
+.map-policy-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}
+.map-policy-options button,.map-invest-options button{background:white;border:1px solid #c7dfcc;border-radius:9px;min-height:43px;color:#365948;font-weight:700;font-size:11px;padding:7px}
+.map-policy-options button.selected{background:#d9f2df;border-color:#34805a;color:#21583d}
+.map-operations-tax{display:flex;flex-direction:column;gap:12px;margin-top:15px;font-size:12px}
+.map-operations-tax input{width:100%;accent-color:#25885f}
+.map-operations-tax span{font-size:10px;color:#59746a;line-height:1.5}
+.map-invest-options{display:grid;gap:6px;margin-top:10px}
+.map-invest-options button{display:flex;justify-content:space-between;align-items:center;text-align:left;gap:8px}
+.map-invest-options span{color:#397a5e;font-size:10px}
+.map-invest-options button:disabled{opacity:.45}
+.map-traffic-quick{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px;font-size:10px}
+.map-traffic-quick span{padding:9px;background:#eaf4ed;border-radius:7px}
+.map-traffic-quick b{display:block;font-size:16px}
+.map-traffic-quick button{border-radius:7px;background:#287357;color:white;font-size:10px;min-height:39px}
+.map-operations-dismiss{width:100%;margin-top:9px;min-height:35px;background:#d7eadd;color:#286047;border-radius:7px;font-weight:800;font-size:11px}
+@media(max-width:700px){
+  .menu{display:flex;justify-content:space-evenly}
+  .menu-link{width:47%;flex:1;max-width:200px}
+  .data-subnav{position:relative;z-index:11;gap:4px;padding:7px}
+  .data-subnav button{min-width:0;padding:9px 3px;font-size:9px}
+  .data-subnav button span{display:none}
+  .map-operations{top:auto;right:8px;bottom:calc(116px + env(safe-area-inset-bottom));width:min(306px,calc(100% - 18px))}
+  .map-operations-body{max-height:min(370px,52dvh);overflow-y:auto;overscroll-behavior:contain}
+  .map-operations.is-open{z-index:17}
+  .map-construction-focus{top:72px}
+  .app-shell[data-tools-open="yes"] .map-operations{bottom:calc(258px + env(safe-area-inset-bottom))}
+}
+
+/* Keep decisions that affect gameplay on the persistent city map. */
+.map-operations-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.map-budget-controls{display:grid;gap:9px;margin-top:11px}
+.map-budget-condition{display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;padding:8px 9px;border-radius:8px;background:#e8f2ea;font-size:10px}
+.map-budget-condition strong{font-size:11px;color:#225842}
+.map-budget-options{display:flex;gap:5px;flex-wrap:wrap}
+.map-budget-options button{min-height:37px;flex:1;min-width:68px;border-radius:8px;background:white;border:1px solid #d1e4d4;padding:7px 5px;color:#38664d;font-size:10px;font-weight:750}
+.map-budget-options button.selected{background:#d7eddd;border-color:#278254;box-shadow:inset 0 0 0 1px #278254}
+.map-budget-borrow{padding:10px;background:#315f76;color:white;font-weight:800;font-size:11px;border-radius:8px}
+.map-budget-borrow:disabled{opacity:.48}
+@media(max-width:700px){.map-budget-options button{min-width:64px}.map-operations-tabs button{font-size:10px}}
+
+/* Map toolbar must always be reachable. Place governance beneath the camera
+ * controls on desktop, and keep active construction notices away from the
+ * vertical controls on narrow phones. */
+@media(min-width:701px){
+ .map-operations{top:78px}
+ .map-construction-focus{top:136px}
+ .map-operations.is-open ~ .map-construction-focus{opacity:0;pointer-events:none}
+}
+@media(max-width:700px){
+ .map-construction-focus{left:8px;right:auto;top:74px;max-width:calc(100% - 88px)}
+}
