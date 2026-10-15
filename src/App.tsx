@@ -229,7 +229,7 @@ export function App(){
   const selectedStyle=selected?buildingStyleLabel(city,selected.x,selected.y):null;
   const selectedDescription=selected?`${selectedStyle?`${selectedStyle} ／ `:''}${describeTile(city,selected.x,selected.y)}`:'マップをクリックして土地を選択';
   const selectedLandScore=selected?land.values[tileIndex(selected.x,selected.y)]:undefined;
-  return <main className="app-shell" data-active-menu={active} data-tools-open={mobileToolsOpen?'yes':'no'} data-map-quick-open={mapQuickOpen?'yes':'no'}>
+  return <main className="app-shell" data-active-menu={active} data-tools-open={mobileToolsOpen?'yes':'no'} data-map-quick-open={mapQuickOpen?'yes':'no'} data-operations-open={operationsOpen?'yes':'no'}>
     <aside className="sidebar">
       <div className="brand"><div className="brandmark">C<span>•</span></div><div><strong>CITYSCAPE</strong><small>街づくりと都市経営</small></div></div>
       <div className="sidebar-section-label">CITY MANAGER</div>
@@ -271,7 +271,7 @@ export function App(){
           </div>
           {active==='build'&&<div className={`map-quick-menu ${mapQuickOpen?'is-open':''}`} aria-label="地図上の建設メニュー">
             <button type="button" className="map-quick-trigger" aria-label={mapQuickOpen?'地図の建設メニューを閉じる':'地図の建設メニューを開く'} aria-expanded={mapQuickOpen} onClick={openMapQuick}>
-              <span>▦</span><strong>{mapQuickOpen?'コマンドを選ぶ':tool==='inspect'?'地図で建設':`${toolNames[tool]} を配置中`}</strong><b>{mapQuickOpen?'⌄':'⌃'}</b>
+              <span>▦</span><strong>{mapQuickOpen?'建設を選択':tool==='inspect'?'建設':toolNames[tool]}</strong><b>{mapQuickOpen?'⌄':'⌃'}</b>
             </button>
             {mapQuickOpen&&<div className="map-quick-body">
               <div className="map-quick-categories" role="group" aria-label="地図建設カテゴリ">
@@ -291,7 +291,7 @@ export function App(){
           </div>}
           {active==='build'&&<div className={`map-operations ${operationsOpen?'is-open':''}`}>
             <button type="button" className="map-operations-launcher" aria-label={operationsOpen?'都市運営メニューを閉じる':'都市運営メニューを開く'}
-              aria-expanded={operationsOpen} onClick={()=>{setMapQuickOpen(false);setOperationsOpen(v=>!v);}}>⚑ 都市運営 {operationsOpen?'⌄':'⌃'}</button>
+              aria-expanded={operationsOpen} onClick={()=>{setMapQuickOpen(false);setOperationsOpen(v=>!v);}}><span>⚑</span><span className="operations-full-label">都市運営</span><span className="operations-short-label">市政</span><b>{operationsOpen?'⌄':'⌃'}</b></button>
             {operationsOpen&&<div className="map-operations-body">
               <div className="map-operations-summary"><b>市の収支 {shortMoney(stats.balance)}/月</b><span>満足度 {stats.happiness} / 100</span></div>
               <div className="map-operations-tabs" role="group" aria-label="都市運営コマンド">
@@ -338,6 +338,12 @@ export function App(){
               </div>}
               <button type="button" className="map-operations-dismiss" onClick={()=>setOperationsOpen(false)}>地図に戻る ✓</button>
             </div>}
+          </div>}
+          {active==='build'&&<div className="map-time-rail" role="group" aria-label="地図上の時間進行">
+            <button type="button" className="map-time-toggle" onClick={toggle}
+              aria-label={city.paused?'地図で再生':'地図で一時停止'} aria-pressed={!city.paused}>{city.paused?'▶':'Ⅱ'}</button>
+            <button type="button" className="map-time-next" onClick={()=>progressMonth(true)}
+              aria-label="地図で翌月へ進める">翌月 <span>›</span></button>
           </div>}
           {active==='build'&&focusSite&&<button type="button" className="map-construction-focus"
             onClick={viewConstruction} aria-label="工事現場へ移動する">
